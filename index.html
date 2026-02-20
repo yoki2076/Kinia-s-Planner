@@ -450,7 +450,12 @@
         renderList();
         renderMiniCalendar();
         renderJournals();
-        if (autoSwitch && window.innerWidth < 768) switchPanel(1);
+        if (autoSwitch && window.innerWidth < 768) {
+            // 如果已在時間軸，留在時間軸；否則跳到行事曆
+            const currentPanel = document.querySelector('.nav-item.active');
+            const currentIndex = [...document.querySelectorAll('.nav-item')].indexOf(currentPanel);
+            switchPanel(currentIndex === 2 ? 2 : 1);
+        }
     }
 
     function renderList() {
