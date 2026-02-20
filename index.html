@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Planner">
 
-<link rel="apple-touch-icon" href="icon.png">
+<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3652/3652191.png">
 
 <style>
     /* 針對 iPhone 的小修正：避免點擊輸入框時畫面亂跳 */
@@ -122,6 +122,24 @@
         }
 
         .text-bubble { background: #2c2c2e; padding: 12px 18px; border-radius: 18px; line-height: 1.5; outline: none; color: white; font-size: 1.1rem; max-width: 75%; flex: 1; }
+
+        /* 時間編輯區 */
+        .time-edit-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .time-confirm-btn {
+            background: #2ecc71;
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            width: 36px;
+            height: 26px;
+            font-size: 1rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        .time-confirm-btn:active { background: #27ae60; }
 
         /* 刪除按鈕樣式 */
         .del-journal-btn {
@@ -492,6 +510,20 @@
         }
     }
 
+    function showTimeConfirm(index) {
+        const btn = document.getElementById('time-confirm-' + index);
+        if (btn) btn.style.display = 'inline-flex';
+    }
+
+    function confirmTime(index) {
+        const input = document.getElementById('time-input-' + index);
+        const btn = document.getElementById('time-confirm-' + index);
+        if (input && input.value) {
+            updateJournalTime(index, input.value);
+        }
+        if (btn) btn.style.display = 'none';
+    }
+
     function renderJournals() {
         const group = document.getElementById('bubbleGroup'); group.innerHTML = '';
         const items = db.journals[activeDateStr] || [];
@@ -499,7 +531,12 @@
         items.forEach((item, index) => {
             group.innerHTML += `
                 <div class="bubble-item">
-                    <input type="time" class="time-tag" value="${item.time}" onchange="updateJournalTime(${index}, this.value)">
+                    <div class="time-edit-wrap">
+                        <input type="time" class="time-tag" value="${item.time}" id="time-input-${index}"
+                            onfocus="showTimeConfirm(${index})"
+                            oninput="showTimeConfirm(${index})">
+                        <button class="time-confirm-btn" id="time-confirm-${index}" onclick="confirmTime(${index})" style="display:none">✓</button>
+                    </div>
                     <div class="text-bubble" contenteditable="true" onblur="updateJournalText(${index}, this.innerText)">${item.text}</div>
                     <button class="del-journal-btn" onclick="deleteJournal(${index})">🗑️</button>
                 </div>`;
