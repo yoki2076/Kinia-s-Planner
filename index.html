@@ -510,20 +510,6 @@
         }
     }
 
-    function showTimeConfirm(index) {
-        const btn = document.getElementById('time-confirm-' + index);
-        if (btn) btn.style.display = 'inline-flex';
-    }
-
-    function confirmTime(index) {
-        const input = document.getElementById('time-input-' + index);
-        const btn = document.getElementById('time-confirm-' + index);
-        if (input && input.value) {
-            updateJournalTime(index, input.value);
-        }
-        if (btn) btn.style.display = 'none';
-    }
-
     function renderJournals() {
         const group = document.getElementById('bubbleGroup'); group.innerHTML = '';
         const items = db.journals[activeDateStr] || [];
@@ -531,12 +517,7 @@
         items.forEach((item, index) => {
             group.innerHTML += `
                 <div class="bubble-item">
-                    <div class="time-edit-wrap">
-                        <input type="time" class="time-tag" value="${item.time}" id="time-input-${index}"
-                            onfocus="showTimeConfirm(${index})"
-                            oninput="showTimeConfirm(${index})">
-                        <button class="time-confirm-btn" id="time-confirm-${index}" onclick="confirmTime(${index})" style="display:none">✓</button>
-                    </div>
+                    <input type="time" class="time-tag" value="${item.time}" onblur="updateJournalTime(${index}, this.value)">
                     <div class="text-bubble" contenteditable="true" onblur="updateJournalText(${index}, this.innerText)">${item.text}</div>
                     <button class="del-journal-btn" onclick="deleteJournal(${index})">🗑️</button>
                 </div>`;
