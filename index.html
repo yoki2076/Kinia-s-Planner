@@ -277,6 +277,40 @@
         }
         #orientationBtn:hover { background: #383838; }
         #orientationBtn.spin { transform: rotate(180deg); }
+
+        /* --- 書籤版面 --- */
+        .bm-header { background: #000; border-bottom: 1px solid var(--border); height: 60px; display: flex; align-items: center; padding: 0 15px; justify-content: space-between; }
+        .bm-header-title { font-size: 1.1rem; font-weight: bold; color: var(--accent-gray); }
+        .bm-categories { display: flex; gap: 8px; padding: 12px 15px; overflow-x: auto; flex-shrink: 0; border-bottom: 1px solid var(--border); background: #0a0a0a; }
+        .bm-categories::-webkit-scrollbar { display: none; }
+        .bm-cat-btn { background: #1e1e1e; color: var(--text-gray); border: 1px solid var(--border); border-radius: 20px; padding: 5px 16px; font-size: 0.85rem; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+        .bm-cat-btn.active { background: var(--accent-gray); color: #000; border-color: var(--accent-gray); font-weight: bold; }
+        .bm-cat-btn.cat-manage { background: none; color: #555; border: 1px dashed #444; }
+        .bm-list { flex: 1; overflow-y: auto; padding: 12px 15px; display: flex; flex-direction: column; gap: 10px; }
+        .bm-card { background: #1e1e1e; border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; position: relative; }
+        .bm-card-cat { font-size: 0.72rem; color: var(--accent-red); margin-bottom: 6px; letter-spacing: 1px; text-transform: uppercase; }
+        .bm-card-text { font-size: 1rem; color: #efefef; line-height: 1.6; white-space: pre-wrap; outline: none; }
+        .bm-card-del { position: absolute; top: 10px; right: 12px; background: none; border: none; color: #444; font-size: 0.9rem; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+        .bm-card-del:active { color: var(--accent-red); }
+        .bm-input-bar { padding: 12px 15px; background: #000; border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: flex-end; }
+        .bm-input-wrap { flex: 1; background: #1e1e1e; border-radius: 14px; padding: 10px 15px; display: flex; flex-direction: column; gap: 6px; }
+        .bm-cat-select { background: none; border: none; color: var(--accent-red); font-size: 0.78rem; outline: none; cursor: pointer; padding: 0; }
+        .bm-cat-select option { background: #1e1e1e; color: white; }
+        .bm-text-input { background: none; border: none; color: white; font-size: 0.95rem; outline: none; resize: none; width: 100%; font-family: inherit; min-height: 22px; max-height: 80px; overflow-y: auto; }
+        .bm-text-input::placeholder { color: #555; }
+        .bm-add-btn { background: var(--accent-gray); color: #000; border: none; width: 42px; height: 42px; border-radius: 50%; font-size: 2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 0; padding-bottom: 4px; flex-shrink: 0; }
+        .bm-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: flex; align-items: flex-end; }
+        .bm-modal { background: #1e1e1e; border-radius: 20px 20px 0 0; width: 100%; padding: 20px; max-height: 60vh; display: flex; flex-direction: column; gap: 12px; }
+        .bm-modal h3 { margin: 0; color: var(--accent-gray); font-size: 1rem; text-align: center; }
+        .bm-modal-cats { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+        .bm-modal-cat-row { display: flex; align-items: center; justify-content: space-between; background: #2a2a2a; border-radius: 10px; padding: 10px 14px; }
+        .bm-modal-cat-name { color: #efefef; font-size: 0.95rem; }
+        .bm-modal-cat-del { background: none; border: none; color: #555; font-size: 0.9rem; cursor: pointer; }
+        .bm-modal-cat-del:active { color: var(--accent-red); }
+        .bm-modal-add-row { display: flex; gap: 8px; }
+        .bm-modal-input { flex: 1; background: #2a2a2a; border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; color: white; font-size: 0.95rem; outline: none; font-family: inherit; }
+        .bm-modal-confirm { background: var(--accent-gray); color: #000; border: none; border-radius: 10px; padding: 10px 18px; font-size: 0.9rem; cursor: pointer; font-weight: bold; }
+        .bm-modal-close { background: #2a2a2a; color: var(--text-gray); border: none; border-radius: 10px; padding: 10px; font-size: 0.95rem; cursor: pointer; width: 100%; }
     </style>
 </head>
 <body>
@@ -332,12 +366,28 @@
             <button class="add-btn" onclick="addJournal()">+</button>
         </div>
     </div>
+
+    <div class="panel" id="bookmarkPanel">
+        <div class="bm-header">
+            <span class="bm-header-title">書籤</span>
+        </div>
+        <div class="bm-categories" id="bmCatFilter"></div>
+        <div class="bm-list" id="bmList"></div>
+        <div class="bm-input-bar">
+            <div class="bm-input-wrap">
+                <select class="bm-cat-select" id="bmCatSelect"></select>
+                <textarea class="bm-text-input" id="bmTextInput" placeholder="記下感想、Quote..."></textarea>
+            </div>
+            <button class="bm-add-btn" onclick="addBookmark()">+</button>
+        </div>
+    </div>
 </div>
 
 <div class="nav-bar">
     <button class="nav-item active" id="nav-week" onclick="switchPanel(0)">週曆</button>
     <button class="nav-item" id="nav-list" onclick="switchPanel(1)">行事曆</button>
     <button class="nav-item" id="nav-journal" onclick="switchPanel(2)">時間軸</button>
+    <button class="nav-item" id="nav-bookmark" onclick="switchPanel(3)">書籤</button>
 </div>
 
 <!-- 旋轉視窗按鈕（只在 Electron 桌面版顯示） -->
@@ -355,7 +405,9 @@
         return `${y}-${m}-${d}`;
     }
 
-    let db = JSON.parse(localStorage.getItem('mega_planner_v7')) || { calendar: {}, journals: {} };
+    let db = JSON.parse(localStorage.getItem('mega_planner_v7')) || { calendar: {}, journals: {}, bookmarks: [], bmCategories: ['感想', 'Quote', '靈感'] };
+    if (!db.bookmarks) db.bookmarks = [];
+    if (!db.bmCategories) db.bmCategories = ['感想', 'Quote', '靈感'];
     let activeDateStr = getTWDateString();
     let viewDate = new Date();
     let weekStartDate = new Date();
@@ -655,6 +707,105 @@
         }
     }
 
+
+    // ===== 書籤功能 =====
+    let activeBmCat = '全部';
+
+    function renderBmCategories() {
+        const filter = document.getElementById('bmCatFilter');
+        const select = document.getElementById('bmCatSelect');
+        const cats = db.bmCategories;
+        filter.innerHTML = `<button class="bm-cat-btn ${activeBmCat === '全部' ? 'active' : ''}" onclick="filterBmCat('全部')">全部</button>`;
+        cats.forEach(c => {
+            filter.innerHTML += `<button class="bm-cat-btn ${activeBmCat === c ? 'active' : ''}" onclick="filterBmCat('${c}')">${c}</button>`;
+        });
+        filter.innerHTML += `<button class="bm-cat-btn cat-manage" onclick="openCatModal()">＋ 分類</button>`;
+        select.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+
+    function filterBmCat(cat) {
+        activeBmCat = cat;
+        renderBmCategories();
+        renderBookmarks();
+    }
+
+    function renderBookmarks() {
+        const list = document.getElementById('bmList');
+        const items = activeBmCat === '全部'
+            ? db.bookmarks
+            : db.bookmarks.filter(b => b.cat === activeBmCat);
+        if (items.length === 0) {
+            list.innerHTML = '<div style="color:#444;text-align:center;margin-top:40px;font-size:0.9rem;">還沒有書籤，快來記下第一條！</div>';
+            return;
+        }
+        list.innerHTML = items.map((b) => {
+            const realIndex = db.bookmarks.indexOf(b);
+            return `<div class="bm-card">
+                <div class="bm-card-cat">${b.cat}</div>
+                <div class="bm-card-text" contenteditable="true" onblur="updateBookmark(${realIndex}, this.innerText)">${b.text}</div>
+                <button class="bm-card-del" onclick="deleteBookmark(${realIndex})">✕</button>
+            </div>`;
+        }).join('');
+    }
+
+    function addBookmark() {
+        const text = document.getElementById('bmTextInput').value.trim();
+        const cat = document.getElementById('bmCatSelect').value;
+        if (!text) return;
+        db.bookmarks.unshift({ cat, text });
+        document.getElementById('bmTextInput').value = '';
+        save(); renderBookmarks();
+    }
+
+    function updateBookmark(index, text) {
+        db.bookmarks[index].text = text;
+        save();
+    }
+
+    function deleteBookmark(index) {
+        if (confirm('確定刪除這條書籤？')) {
+            db.bookmarks.splice(index, 1);
+            save(); renderBookmarks();
+        }
+    }
+
+    function openCatModal() {
+        renderCatModal();
+        document.getElementById('bmModalOverlay').style.display = 'flex';
+    }
+
+    function closeCatModal() {
+        document.getElementById('bmModalOverlay').style.display = 'none';
+        renderBmCategories();
+        renderBookmarks();
+    }
+
+    function renderCatModal() {
+        const el = document.getElementById('bmModalCats');
+        el.innerHTML = db.bmCategories.map((c, i) => `
+            <div class="bm-modal-cat-row">
+                <span class="bm-modal-cat-name">${c}</span>
+                <button class="bm-modal-cat-del" onclick="deleteCategory(${i})">✕</button>
+            </div>`).join('');
+    }
+
+    function addCategory() {
+        const input = document.getElementById('bmNewCatInput');
+        const name = input.value.trim();
+        if (!name || db.bmCategories.includes(name)) return;
+        db.bmCategories.push(name);
+        input.value = '';
+        save(); renderCatModal(); renderBmCategories();
+    }
+
+    function deleteCategory(index) {
+        const name = db.bmCategories[index];
+        if (confirm(`刪除分類「${name}」？\n（該分類的書籤不會被刪除）`)) {
+            db.bmCategories.splice(index, 1);
+            save(); renderCatModal(); renderBmCategories();
+        }
+    }
+
     window.onload = () => {
         // 如果是在 Electron 中執行,才顯示旋轉按鈕
         if (window.electronAPI) {
@@ -668,6 +819,8 @@
         weekStartDate = getWeekStart(new Date());
         selectDate(activeDateStr, false);
         renderWeekView();
+        renderBmCategories();
+        renderBookmarks();
         
         // 初始化桌面版佈局
         if (window.innerWidth >= 768) {
@@ -675,5 +828,19 @@
         }
     };
 </script>
+
+<!-- 書籤分類管理 -->
+<div class="bm-modal-overlay" id="bmModalOverlay" style="display:none" onclick="if(event.target===this)closeCatModal()">
+    <div class="bm-modal">
+        <h3>管理分類</h3>
+        <div class="bm-modal-cats" id="bmModalCats"></div>
+        <div class="bm-modal-add-row">
+            <input class="bm-modal-input" id="bmNewCatInput" placeholder="新增分類名稱..." onkeypress="if(event.key==='Enter')addCategory()">
+            <button class="bm-modal-confirm" onclick="addCategory()">新增</button>
+        </div>
+        <button class="bm-modal-close" onclick="closeCatModal()">完成</button>
+    </div>
+</div>
+
 </body>
 </html>
