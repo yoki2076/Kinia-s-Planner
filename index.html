@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Planner">
 
-<link rel="apple-touch-icon" href="icon.png">
+<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3652/3652191.png">
 
 <style>
     /* 針對 iPhone 的小修正：避免點擊輸入框時畫面亂跳 */
@@ -75,20 +75,20 @@
 
         /* --- 月曆區域 --- */
         .calendar-drawer { background: #1e1e1e; border-bottom: 1px solid var(--border); overflow: hidden; transition: height 0.3s ease; }
-        .calendar-drawer.expanded { height: 320px; }
-        .calendar-drawer.collapsed { height: 140px; }
+        .calendar-drawer.expanded { height: auto; max-height: 320px; }
+        .calendar-drawer.collapsed { height: 112px; }
 
         .mini-cal-nav { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px 4px 15px; background: #1e1e1e; }
         .mini-cal-title { font-size: 0.95rem; font-weight: bold; color: var(--accent-gray); }
         .mini-nav-btn { background: none; border: none; color: var(--accent-gray); cursor: pointer; font-size: 1rem; padding: 0 10px; }
 
-        .mini-calendar { padding: 10px 5px; display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+        .mini-calendar { padding: 6px 8px 8px 8px; display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
         .cal-head { font-size: 0.75rem; color: var(--text-gray); padding-bottom: 5px; }
         
         .cal-date { 
-            padding: 8px 0; border-radius: 6px; cursor: pointer; font-size: 1rem; 
+            padding: 3px 0; border-radius: 6px; cursor: pointer; font-size: 0.78rem; 
             display: flex; align-items: center; justify-content: center;
-            width: 80%; margin: 0 auto;
+            width: 90%; margin: 0 auto;
         }
         .cal-date.selected { background: var(--accent-gray); color: #000; font-weight: bold; }
         .cal-date.is-weekend { color: var(--accent-red); }
@@ -284,9 +284,9 @@
 <div class="container" id="mainContainer">
     <div class="panel" id="weekPanel">
         <div class="week-header">
-            <button class="week-nav-btn" onclick="changeWeek(-1)">◀ 上週</button>
+            <button class="week-nav-btn" onclick="changeWeek(-1)"><span style="font-family:monospace;font-style:normal;">◀</span> 上週</button>
             <div class="week-title" id="weekTitle">第 X 週</div>
-            <button class="week-nav-btn" onclick="changeWeek(1)">下週 ▶</button>
+            <button class="week-nav-btn" onclick="changeWeek(1)">下週 <span style="font-family:monospace;font-style:normal;">▶</span></button>
         </div>
         <div class="week-view" id="weekView">
             <div class="week-grid" id="weekGrid"></div>
@@ -295,9 +295,9 @@
 
     <div class="panel" id="listPanel">
         <div class="c-cal-header">
-            <button class="c-cal-btn" onclick="changeMonth(-1)"> ◀ </button>
+            <button class="c-cal-btn" onclick="changeMonth(-1)"><span style="font-family:monospace;font-style:normal;">◀</span></button>
             <div class="c-cal-month-display" id="currentMonth" onclick="goToday(false)">FEB 2026</div>
-            <button class="c-cal-btn" onclick="changeMonth(1)"> ▶ </button>
+            <button class="c-cal-btn" onclick="changeMonth(1)"><span style="font-family:monospace;font-style:normal;">▶</span></button>
         </div>
         <div class="list-view" id="calendarList"></div>
     </div>
@@ -306,7 +306,7 @@
         <div class="right-header">
             <div class="header-title-area" onclick="toggleCalendar()">
                 <span id="selectedDateTitle" style="font-weight: bold;">---</span>
-                <span id="drawerArrow" style="font-size: 0.8rem; color: var(--accent-gray);"> ▼</span>
+                <span id="drawerArrow" style="font-size: 0.8rem; color: var(--accent-gray);"><span style="font-family:monospace;font-style:normal;">▼</span></span>
             </div>
             <div class="header-btns">
                 <button class="today-btn-dark" onclick="goToday(true)">返回今天</button>
@@ -318,9 +318,9 @@
         
         <div class="calendar-drawer collapsed" id="calDrawer">
             <div class="mini-cal-nav">
-                <button class="mini-nav-btn" onclick="changeMonth(-1)">◀</button>
+                <button class="mini-nav-btn" onclick="changeMonth(-1)"><span style="font-family:monospace;font-style:normal;">◀</span></button>
                 <div class="mini-cal-title" id="miniMonthTitle">FEB 2026</div>
-                <button class="mini-nav-btn" onclick="changeMonth(1)">▶</button>
+                <button class="mini-nav-btn" onclick="changeMonth(1)"><span style="font-family:monospace;font-style:normal;">▶</span></button>
             </div>
             <div class="mini-calendar" id="miniCalGrid"></div>
         </div>
@@ -426,7 +426,7 @@
         isCalExpanded = !isCalExpanded;
         drawer.classList.toggle('expanded', isCalExpanded);
         drawer.classList.toggle('collapsed', !isCalExpanded);
-        arrow.innerText = isCalExpanded ? " ▲" : " ▼";
+        arrow.innerHTML = isCalExpanded ? ' <span style="font-family:monospace;font-style:normal;">▲</span>' : ' <span style="font-family:monospace;font-style:normal;">▼</span>';
         renderMiniCalendar();
     }
 
