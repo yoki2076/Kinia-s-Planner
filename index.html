@@ -1,12 +1,32 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Planner">
+
+<link rel="apple-touch-icon" href="icon.png">
+
+<style>
+    /* 針對 iPhone 的小修正：避免點擊輸入框時畫面亂跳 */
+    input, div[contenteditable] {
+        font-size: 16px !important; /* iOS 若字體小於 16px 會自動放大畫面 */
+    }
+    
+    /* 修正底部導覽列在 iPhone 全螢幕模式下被手勢桿遮擋的問題 */
+    .nav-bar {
+        padding-bottom: env(safe-area-inset-bottom);
+        height: calc(60px + env(safe-area-inset-bottom));
+    }
+</style>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Ultimate Planner V15.4 - Bookmark Category Manager</title>
-
-    <link rel="apple-touch-icon" href="icon.png">
+    <title>Kinia's Planner</title>
     
+    <script defer src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
     <style>
         :root {
             --bg-dark: #121212;
@@ -16,8 +36,6 @@
             --accent-gray: #e0e0e0;
             --accent-red: #ff453a;
             --border: #333;
-            --input-bg: #2c2c2e;
-            --bm-card: #252525;
         }
 
         * {
@@ -29,395 +47,800 @@
         body, html {
             margin: 0; padding: 0; height: 100%;
             background-color: var(--bg-dark);
-            color: white; 
-            overflow: hidden;
+            color: white; overflow: hidden;
         }
 
         .container { display: flex; height: 100vh; width: 100vw; transition: transform 0.3s ease; }
-        .panel { width: 100vw; height: calc(100vh - 60px); flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid var(--border); }
+        .panel { width: 100vw; height: calc(100vh - 60px); flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden; }
 
-        /* --- Headers --- */
-        .header { 
-            background-color: var(--header-black); 
-            display: flex; align-items: center; justify-content: space-between; 
-            padding: 10px 15px; border-bottom: 1px solid var(--border); height: 60px; 
+        /* --- 行事曆 Header --- */
+        .c-cal-header { background-color: var(--header-black); display: flex; align-items: center; justify-content: space-between; padding: 10px 5px; border-bottom: 1px solid var(--border); height: 60px; }
+        .c-cal-btn { background: #1a1a1a; color: white; border: 1px solid #333; padding: 5px 20px; cursor: pointer; font-size: 1.2rem; border-radius: 4px; }
+        .c-cal-month-display { font-size: 1.2rem; font-weight: bold; text-align: center; flex: 1; cursor: pointer; }
+
+        /* --- 列表視圖 --- */
+        .list-view { flex: 1; overflow-y: auto; }
+        .day-row { display: flex; border-bottom: 1px solid var(--border); min-height: 75px; cursor: pointer; align-items: stretch; }
+        .day-row.selected { background: #2a2a2a; border-left: 4px solid var(--accent-gray); }
+        .day-num { width: 60px; border-right: 1px solid var(--border); flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: bold; text-align: center; }
+        .day-content { flex: 1; padding: 15px; font-size: 1.1rem; white-space: pre-wrap; outline: none; color: #efefef; align-self: center; }
+
+        /* --- 時間軸 Header --- */
+        .right-header { padding: 0 10px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #111; height: 60px; gap: 5px; }
+        .header-title-area { flex: 1; min-width: 0; }
+        .header-btns { display: flex; gap: 5px; flex-shrink: 0; }
+
+        .today-btn-dark, .io-btn { background: #252525; color: white; border: 1px solid #444; padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
+        .io-btn { padding: 4px 6px; }
+
+        /* --- 月曆區域 --- */
+        .calendar-drawer { background: #1e1e1e; border-bottom: 1px solid var(--border); overflow: hidden; transition: height 0.3s ease; }
+        .calendar-drawer.expanded { height: auto; max-height: 320px; }
+        .calendar-drawer.collapsed { height: 112px; }
+
+        .mini-cal-nav { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px 4px 15px; background: #1e1e1e; }
+        .mini-cal-title { font-size: 0.95rem; font-weight: bold; color: var(--accent-gray); }
+        .mini-nav-btn { background: none; border: none; color: var(--accent-gray); cursor: pointer; font-size: 1rem; padding: 0 10px; }
+
+        .mini-calendar { padding: 6px 8px 8px 8px; display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+        .cal-head { font-size: 0.75rem; color: var(--text-gray); padding-bottom: 5px; }
+        
+        .cal-date { 
+            padding: 3px 0; border-radius: 6px; cursor: pointer; font-size: 0.78rem; 
+            display: flex; align-items: center; justify-content: center;
+            width: 90%; margin: 0 auto;
         }
-
-        .btn-sm { background: #252525; color: white; border: 1px solid #444; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; }
-
-        /* --- 書籤管理 UI 擴充 --- */
-        .cat-add-bar {
-            display: flex; gap: 8px; margin-bottom: 15px; padding-bottom: 15px;
-            border-bottom: 1px solid #333;
-        }
-        .cat-add-bar input {
-            flex: 1; background: #2c2c2e; border: 1px solid #444; color: white;
-            border-radius: 6px; padding: 8px 12px; outline: none;
-        }
-
-        .bookmark-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 12px; background: #1a1a1a; border-bottom: 1px solid #333; scrollbar-width: none; }
-        .bookmark-tabs::-webkit-scrollbar { display: none; }
-
-        .bookmark-item { background: var(--bm-card); border-radius: 10px; padding: 14px; margin-bottom: 12px; border: 1px solid #333; border-left: 4px solid var(--accent-gray); position: relative; }
-        .bm-text { font-size: 1rem; color: #eee; line-height: 1.6; margin-bottom: 8px; word-break: break-all; }
-        .bm-date { font-size: 0.75rem; color: #666; text-align: right; display: block; }
-        .bm-del-btn { position: absolute; top: 8px; right: 8px; background: none; border: none; color: #555; cursor: pointer; }
-
-        /* --- 時間軸與輸入框 --- */
-        .journal-flow { flex: 1; overflow-y: auto; padding: 20px; }
-        .bubble-item { display: flex; gap: 12px; margin-bottom: 15px; align-items: center; position: relative; }
-        .time-input { background: #252525; border: 1px solid rgba(176,176,176,0.3); color: var(--text-gray); border-radius: 8px; padding: 6px 4px 6px 8px; font-size: 0.85rem; outline: none; width: 100px; display: flex; align-items: center; }
-        .time-input::-webkit-calendar-picker-indicator { filter: invert(70%); cursor: pointer; margin-left: 5px; }
-        .text-bubble { background: #2c2c2e; padding: 12px 40px 12px 16px; border-radius: 18px; flex: 1; position: relative; color: white; outline: none; min-height: 44px; display: flex; align-items: center; }
-        .jn-del-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #888; font-size: 1.1rem; cursor: pointer; padding: 5px; }
-
-        /* --- 通用樣式 --- */
-        .week-grid { display: grid; grid-template-columns: 1fr; gap: 12px; padding: 15px; overflow-y: auto; }
-        .week-card { background: var(--card-dark); border-radius: 12px; padding: 15px; border: 1px solid #333; }
-        .week-card.today { border: 2px solid var(--accent-gray); }
-        .week-day-title { font-weight: bold; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-        .week-day-content { font-size: 0.95rem; color: #efefef; min-height: 2.5em; outline: none; white-space: pre-wrap; background: var(--input-bg); border-radius: 8px; padding: 10px; border: 1px solid transparent; }
-
-        .list-view { flex: 1; overflow-y: auto; scroll-behavior: smooth; background: var(--bg-dark); }
-        .day-row { display: flex; border-bottom: 1px solid var(--border); min-height: 80px; align-items: stretch; }
-        .day-row.selected { background: #1a1a1a; border-left: 4px solid var(--accent-gray); }
-        .day-num-box { width: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 1px solid var(--border); background: rgba(255,255,255,0.02); }
-        .day-num { font-size: 1.3rem; font-weight: bold; }
-        .day-weekday { font-size: 0.75rem; }
-        .day-content { flex: 1; padding: 15px; outline: none; white-space: pre-wrap; color: #efefef; line-height: 1.4; }
-        .is-weekend-text { color: var(--accent-red) !important; }
-
-        .calendar-drawer { background: #1a1a1a; border-bottom: 1px solid var(--border); overflow: hidden; transition: max-height 0.3s ease; }
-        .calendar-drawer.expanded { max-height: 500px; padding-bottom: 15px; }
-        .calendar-drawer.collapsed { max-height: 140px; }
-        .mini-calendar { padding: 10px 5px; display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
-        .cal-date { padding: 8px 0; border-radius: 6px; cursor: pointer; font-size: 0.9rem; width: 85%; margin: 0 auto; }
         .cal-date.selected { background: var(--accent-gray); color: #000; font-weight: bold; }
         .cal-date.is-weekend { color: var(--accent-red); }
-        
-        .input-bar { padding: 12px; background: #000; border-top: 1px solid var(--border); display: flex; gap: 8px; }
-        .input-bar input { flex: 1; background: #2c2c2e; border: none; border-radius: 20px; padding: 10px 18px; color: white; outline: none; }
-        .add-circle { background: var(--accent-gray); color: black; width: 42px; height: 42px; border-radius: 50%; border: none; font-size: 1.6rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .cal-date.other-month { opacity: 0.2; }
 
-        .nav-bar { position: fixed; bottom: 0; width: 100vw; height: 60px; background: #000; border-top: 1px solid var(--border); display: flex; z-index: 1000; }
-        .nav-item { flex: 1; border: none; background: none; color: var(--text-gray); font-size: 0.9rem; cursor: pointer; }
-        .nav-item.active { color: white; font-weight: bold; }
+        /* --- 日記內容 --- */
+        .journal-view { flex: 1; overflow-y: auto; padding: 20px; scroll-behavior: smooth; }
+        .bubble-group { display: flex; flex-direction: column; gap: 20px; }
+        .bubble-item { display: flex; gap: 12px; align-items: flex-start; position: relative; }
+
+        /* 時間框：仿圖一 UI 樣式 */
+        .time-tag { 
+            background: rgba(255, 255, 255, 0.08); 
+            padding: 6px 10px; 
+            border-radius: 10px; 
+            font-size: 0.85rem; 
+            color: var(--text-gray); 
+            border: none;
+            box-shadow: none;
+            outline: none;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+        }
+
+        .time-tag::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+            filter: invert(0.8);
+            opacity: 0.6;
+            margin-left: 4px;
+        }
+
+        .text-bubble { background: #2c2c2e; padding: 12px 18px; border-radius: 18px; line-height: 1.5; outline: none; color: white; font-size: 1.1rem; max-width: 75%; flex: 1; }
+
+        /* 時間編輯區 */
+        .time-edit-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .time-confirm-btn {
+            background: #2ecc71;
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            width: 36px;
+            height: 26px;
+            font-size: 1rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        .time-confirm-btn:active { background: #27ae60; }
+
+        /* 刪除按鈕樣式 */
+        .del-journal-btn {
+            background: rgba(255, 69, 58, 0.15);
+            color: var(--accent-red);
+            border: none;
+            padding: 8px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            align-self: center;
+            transition: background 0.2s;
+        }
+        .del-journal-btn:active { background: rgba(255, 69, 58, 0.3); }
+
+        /* --- 下方輸入欄 --- */
+        .input-bar { padding: 15px; background: #000; border-top: 1px solid var(--border); display: flex; gap: 10px; align-items: center; }
+        #newJournalInput { flex: 1; background: #2c2c2e; border: none; border-radius: 20px; padding: 12px 20px; color: white; outline: none; font-size: 1rem; }
+        .add-btn { background: var(--accent-gray); color: #000; border: none; width: 42px; height: 42px; border-radius: 50%; font-size: 2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 0; padding-bottom: 4px; }
+
+        /* --- 底部導覽 --- */
+        .nav-bar { position: fixed; bottom: 0; width: 100vw; height: 60px; background: #000; border-top: 1px solid var(--border); display: flex; justify-content: space-around; align-items: center; z-index: 100; }
+        .nav-item { color: var(--text-gray); font-size: 1.1rem; text-align: center; border: none; background: none; flex: 1; padding: 10px; cursor: pointer; }
+        .nav-item.active { color: var(--accent-gray); font-weight: bold; }
+
+        /* --- 週曆視圖 --- */
+        .week-view { flex: 1; overflow-y: auto; padding: 10px; }
+        .week-header { 
+            background: #1e1e1e; 
+            padding: 12px 15px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            border-bottom: 1px solid var(--border);
+        }
+        .week-title { font-weight: bold; font-size: 1.1rem; }
+        .week-nav-btn { 
+            background: #252525; 
+            color: white; 
+            border: 1px solid #444; 
+            padding: 6px 12px; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-size: 0.9rem;
+        }
+        .week-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
+            gap: 10px; 
+            padding: 10px 0;
+        }
+        .week-day-card { 
+            background: #1e1e1e; 
+            border: 1px solid var(--border); 
+            border-radius: 12px; 
+            padding: 15px;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+        }
+        .week-day-card.today { border-color: var(--accent-gray); border-width: 2px; }
+        .week-day-header { 
+            font-weight: bold; 
+            font-size: 1.1rem; 
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .week-day-date { color: var(--text-gray); font-size: 0.85rem; }
+        .week-day-content { 
+            flex: 1; 
+            background: #2c2c2e; 
+            border-radius: 8px; 
+            padding: 12px; 
+            outline: none; 
+            color: #efefef; 
+            font-size: 0.95rem;
+            white-space: pre-wrap;
+            min-height: 120px;
+        }
 
         @media (min-width: 768px) {
-            .panel { width: 35%; }
-            #journalPanel { width: 65%; display: flex !important; }
-            #weekPanel, #listPanel, #bookmarkPanel { display: none; }
-            #weekPanel.active-left, #listPanel.active-left, #bookmarkPanel.active-left { display: flex; }
-            .nav-bar { width: 35%; }
-            .nav-item:nth-child(4) { display: none; }
+            .container { 
+                transform: none !important; 
+                width: 100vw; 
+                display: flex;
+            }
+            .panel { 
+                width: 35%; 
+                height: calc(100vh - 60px); /* 扣除導航欄高度 */
+                border-right: 1px solid var(--border); 
+            }
+            #journalPanel { 
+                width: 65%; 
+                height: 100vh; /* 右側時間軸佔滿高度 */
+                display: flex !important;
+            }
+            /* 左側面板切換：週曆或行事曆 */
+            #weekPanel, #listPanel {
+                display: none;
+            }
+            #weekPanel.active-left, #listPanel.active-left {
+                display: flex;
+            }
+            .nav-bar { 
+                display: flex !important;
+                width: 35%;
+                left: 0;
+                bottom: 0;
+            }
+            .nav-bar .nav-item:last-child {
+                display: none; /* 隱藏時間軸按鈕 */
+            }
         }
+
+        /* --- 旋轉按鈕 --- */
+        #orientationBtn {
+            position: fixed;
+            top: 12px;
+            right: 10px;
+            z-index: 999;
+            background: #252525;
+            color: var(--accent-gray);
+            border: 1px solid #444;
+            border-radius: 8px;
+            width: 34px;
+            height: 34px;
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s, transform 0.4s;
+        }
+        #orientationBtn:hover { background: #383838; }
+        #orientationBtn.spin { transform: rotate(180deg); }
+
+        /* --- 書籤版面 --- */
+        .bm-header { background: #000; border-bottom: 1px solid var(--border); height: 60px; display: flex; align-items: center; padding: 0 15px; justify-content: space-between; }
+        .bm-header-title { font-size: 1.1rem; font-weight: bold; color: var(--accent-gray); }
+        .bm-categories { display: flex; gap: 8px; padding: 12px 15px; overflow-x: auto; flex-shrink: 0; border-bottom: 1px solid var(--border); background: #0a0a0a; }
+        .bm-categories::-webkit-scrollbar { display: none; }
+        .bm-cat-btn { background: #1e1e1e; color: var(--text-gray); border: 1px solid var(--border); border-radius: 20px; padding: 5px 16px; font-size: 0.85rem; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+        .bm-cat-btn.active { background: var(--accent-gray); color: #000; border-color: var(--accent-gray); font-weight: bold; }
+        .bm-cat-btn.cat-manage { background: none; color: #555; border: 1px dashed #444; }
+        .bm-list { flex: 1; overflow-y: auto; padding: 12px 15px; display: flex; flex-direction: column; gap: 10px; }
+        .bm-card { background: #1e1e1e; border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; position: relative; }
+        .bm-card-cat { font-size: 0.72rem; color: var(--accent-red); margin-bottom: 6px; letter-spacing: 1px; text-transform: uppercase; }
+        .bm-card-text { font-size: 1rem; color: #efefef; line-height: 1.6; white-space: pre-wrap; outline: none; }
+        .bm-card-del { position: absolute; top: 10px; right: 12px; background: none; border: none; color: #444; font-size: 0.9rem; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+        .bm-card-del:active { color: var(--accent-red); }
+        .bm-input-bar { padding: 12px 15px; background: #000; border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: flex-end; }
+        .bm-input-wrap { flex: 1; background: #1e1e1e; border-radius: 14px; padding: 10px 15px; display: flex; flex-direction: column; gap: 6px; }
+        .bm-cat-select { background: none; border: none; color: var(--accent-red); font-size: 0.78rem; outline: none; cursor: pointer; padding: 0; }
+        .bm-cat-select option { background: #1e1e1e; color: white; }
+        .bm-text-input { background: none; border: none; color: white; font-size: 0.95rem; outline: none; resize: none; width: 100%; font-family: inherit; min-height: 22px; max-height: 80px; overflow-y: auto; }
+        .bm-text-input::placeholder { color: #555; }
+        .bm-add-btn { background: var(--accent-gray); color: #000; border: none; width: 42px; height: 42px; border-radius: 50%; font-size: 2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 0; padding-bottom: 4px; flex-shrink: 0; }
+        .bm-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: flex; align-items: flex-end; }
+        .bm-modal { background: #1e1e1e; border-radius: 20px 20px 0 0; width: 100%; padding: 20px; max-height: 60vh; display: flex; flex-direction: column; gap: 12px; }
+        .bm-modal h3 { margin: 0; color: var(--accent-gray); font-size: 1rem; text-align: center; }
+        .bm-modal-cats { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+        .bm-modal-cat-row { display: flex; align-items: center; justify-content: space-between; background: #2a2a2a; border-radius: 10px; padding: 10px 14px; }
+        .bm-modal-cat-name { color: #efefef; font-size: 0.95rem; }
+        .bm-modal-cat-del { background: none; border: none; color: #555; font-size: 0.9rem; cursor: pointer; }
+        .bm-modal-cat-del:active { color: var(--accent-red); }
+        .bm-modal-add-row { display: flex; gap: 8px; }
+        .bm-modal-input { flex: 1; background: #2a2a2a; border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; color: white; font-size: 0.95rem; outline: none; font-family: inherit; }
+        .bm-modal-confirm { background: var(--accent-gray); color: #000; border: none; border-radius: 10px; padding: 10px 18px; font-size: 0.9rem; cursor: pointer; font-weight: bold; }
+        .bm-modal-close { background: #2a2a2a; color: var(--text-gray); border: none; border-radius: 10px; padding: 10px; font-size: 0.95rem; cursor: pointer; width: 100%; }
     </style>
 </head>
 <body>
 
 <div class="container" id="mainContainer">
     <div class="panel" id="weekPanel">
-        <div class="header">
-            <button class="btn-sm" onclick="changeWeek(-1)">◀ 上一週</button>
-            <div id="weekTitle" onclick="goToday()" style="font-weight:bold; cursor:pointer;">WEEK</div>
-            <button class="btn-sm" onclick="changeWeek(1)">下一週 ▶</button>
+        <div class="week-header">
+            <button class="week-nav-btn" onclick="changeWeek(-1)"><span style="font-family:monospace;font-style:normal;">◀</span> 上週</button>
+            <div class="week-title" id="weekTitle">第 X 週</div>
+            <button class="week-nav-btn" onclick="changeWeek(1)">下週 <span style="font-family:monospace;font-style:normal;">▶</span></button>
         </div>
-        <div class="week-grid" id="weekGrid"></div>
+        <div class="week-view" id="weekView">
+            <div class="week-grid" id="weekGrid"></div>
+        </div>
     </div>
 
     <div class="panel" id="listPanel">
-        <div class="header">
-            <button class="btn-sm" onclick="changeMonth(-1)">◀</button>
-            <div id="monthTitle" style="font-weight:bold; cursor:pointer;" onclick="goToday()">MONTH</div>
-            <button class="btn-sm" onclick="changeMonth(1)">▶</button>
+        <div class="c-cal-header">
+            <button class="c-cal-btn" onclick="changeMonth(-1)"><span style="font-family:monospace;font-style:normal;">◀</span></button>
+            <div class="c-cal-month-display" id="currentMonth" onclick="goToday(false)">FEB 2026</div>
+            <button class="c-cal-btn" onclick="changeMonth(1)"><span style="font-family:monospace;font-style:normal;">▶</span></button>
         </div>
         <div class="list-view" id="calendarList"></div>
     </div>
 
-    <div class="panel" id="bookmarkPanel">
-        <div class="header">
-            <span style="font-weight:bold;">書籤收藏</span>
-            <button class="btn-sm" id="manageBtn" onclick="toggleBookmarkManage()">⚙️ 管理</button>
-        </div>
-        <div id="bookmarkNormalUI" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
-            <div class="bookmark-tabs" id="bookmarkTabs"></div>
-            <div class="journal-flow" id="bookmarkContent" style="padding:15px;"></div>
-            <div class="input-bar">
-                <input type="text" id="bmInput" placeholder="新增內容至當前分類..." onkeypress="if(event.key==='Enter') addBookmarkContent()">
-                <button class="add-circle" onclick="addBookmarkContent()">+</button>
-            </div>
-        </div>
-        <div id="bookmarkManageUI" style="display:none; padding:20px; overflow-y:auto; flex:1;">
-            <div class="cat-add-bar">
-                <input type="text" id="newCatInput" placeholder="新分類名稱..." onkeypress="if(event.key==='Enter') addCategory()">
-                <button class="btn-sm" onclick="addCategory()" style="background:var(--accent-gray); color:black; border:none;">新增分類</button>
-            </div>
-            <div id="categoryManageList"></div>
-        </div>
-    </div>
-
     <div class="panel" id="journalPanel">
-        <div class="header">
-            <div onclick="toggleCalendar()" style="cursor:pointer; flex:1;">
-                <span id="activeDateDisplay" style="font-weight:bold;">日期</span> 
-                <span id="drawerArrow"> ▼</span>
+        <div class="right-header">
+            <div class="header-title-area" onclick="toggleCalendar()">
+                <span id="selectedDateTitle" style="font-weight: bold;">---</span>
+                <span id="drawerArrow" style="font-size: 0.8rem; color: var(--accent-gray);"><span style="font-family:monospace;font-style:normal;">▼</span></span>
             </div>
-            <div style="display:flex; gap:5px;">
-                <button class="btn-sm" onclick="goToday()">今天</button>
-                <button class="btn-sm" onclick="exportData()">📤</button>
-                <button class="btn-sm" onclick="triggerImport()">📥</button>
-                <input type="file" id="importFile" style="display:none" onchange="importJSON(event)">
+            <div class="header-btns">
+                <button class="today-btn-dark" onclick="goToday(true)">返回今天</button>
+                <button class="io-btn" onclick="exportJSON()" title="匯出 JSON">📤</button>
+                <button class="io-btn" onclick="triggerImport()" title="匯入 JSON">📥</button>
+                <input type="file" id="importFile" style="display:none" accept=".json" onchange="importJSON(event)">
             </div>
         </div>
+        
         <div class="calendar-drawer collapsed" id="calDrawer">
-            <div class="mini-cal-nav" style="display:flex; justify-content:space-between; padding:10px 15px;">
-                <button class="btn-sm" onclick="changeDrawerMonth(-1)">◀</button>
-                <div id="miniMonthTitle" style="font-weight:bold; cursor:pointer;" onclick="goToday()">MONTH</div>
-                <button class="btn-sm" onclick="changeDrawerMonth(1)">▶</button>
+            <div class="mini-cal-nav">
+                <button class="mini-nav-btn" onclick="changeMonth(-1)"><span style="font-family:monospace;font-style:normal;">◀</span></button>
+                <div class="mini-cal-title" id="miniMonthTitle">FEB 2026</div>
+                <button class="mini-nav-btn" onclick="changeMonth(1)"><span style="font-family:monospace;font-style:normal;">▶</span></button>
             </div>
             <div class="mini-calendar" id="miniCalGrid"></div>
         </div>
-        <div class="journal-flow" id="journalFlow"></div>
+
+        <div class="journal-view" id="journalFlow"><div class="bubble-group" id="bubbleGroup"></div></div>
+        
         <div class="input-bar">
-            <input type="text" id="jnInput" placeholder="記錄此時此刻..." onkeypress="if(event.key==='Enter') addJournal()">
-            <button class="add-circle" onclick="addJournal()">+</button>
+            <input type="text" id="newJournalInput" placeholder="輸入筆記..." onkeypress="if(event.key==='Enter') addJournal()">
+            <button class="add-btn" onclick="addJournal()">+</button>
+        </div>
+    </div>
+
+    <div class="panel" id="bookmarkPanel">
+        <div class="bm-header">
+            <span class="bm-header-title">書籤</span>
+        </div>
+        <div class="bm-categories" id="bmCatFilter"></div>
+        <div class="bm-list" id="bmList"></div>
+        <div class="bm-input-bar">
+            <div class="bm-input-wrap">
+                <select class="bm-cat-select" id="bmCatSelect"></select>
+                <textarea class="bm-text-input" id="bmTextInput" placeholder="記下感想、Quote..."></textarea>
+            </div>
+            <button class="bm-add-btn" onclick="addBookmark()">+</button>
         </div>
     </div>
 </div>
 
 <div class="nav-bar">
-    <button class="nav-item active" onclick="switchPanel(0)">週曆</button>
-    <button class="nav-item" onclick="switchPanel(1)">行事曆</button>
-    <button class="nav-item" onclick="switchPanel(2)">書籤</button>
-    <button class="nav-item" onclick="switchPanel(3)">時間軸</button>
+    <button class="nav-item active" id="nav-week" onclick="switchPanel(0)">週曆</button>
+    <button class="nav-item" id="nav-list" onclick="switchPanel(1)">行事曆</button>
+    <button class="nav-item" id="nav-journal" onclick="switchPanel(2)">時間軸</button>
+    <button class="nav-item" id="nav-bookmark" onclick="switchPanel(3)">書籤</button>
 </div>
 
+<!-- 旋轉視窗按鈕（只在 Electron 桌面版顯示） -->
+<button id="orientationBtn" title="切換直式／橫式" onclick="toggleOrientation()" style="display:none">⟳</button>
+
 <script>
-    let db = JSON.parse(localStorage.getItem('mega_v14_final_fix')) || {
-        calendar: {}, journals: {}, bookmarks: { "我的筆記": [] }, catOrder: ["我的筆記"]
-    };
-    function save() { localStorage.setItem('mega_v14_final_fix', JSON.stringify(db)); }
-    function getDS(d = new Date()) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+    function getTWDateString(dateObj = new Date()) {
+        const formatter = new Intl.DateTimeFormat('zh-TW', {
+            year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Taipei'
+        });
+        const parts = formatter.formatToParts(dateObj);
+        const y = parts.find(p => p.type === 'year').value;
+        const m = parts.find(p => p.type === 'month').value;
+        const d = parts.find(p => p.type === 'day').value;
+        return `${y}-${m}-${d}`;
+    }
 
-    let activeDS = getDS(), viewMonth = new Date(), drawerMonth = new Date();
-    let isCalExpanded = false, currentCat = db.catOrder[0] || "我的筆記", isManaging = false;
+    let db = JSON.parse(localStorage.getItem('mega_planner_v7')) || { calendar: {}, journals: {}, bookmarks: [], bmCategories: ['感想', 'Quote', '靈感'] };
+    if (!db.bookmarks) db.bookmarks = [];
+    if (!db.bmCategories) db.bmCategories = ['感想', 'Quote', '靈感'];
+    let activeDateStr = getTWDateString();
+    let viewDate = new Date();
+    let weekStartDate = new Date();
+    let isCalExpanded = false;
     const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-    const weekDaysShort = ['日', '一', '二', '三', '四', '五', '六'];
 
-    // --- 書籤功能 ---
-    function renderBookmarkUI() {
-        if(isManaging) { renderManageUI(); return; }
-        const tabs = document.getElementById('bookmarkTabs'); if(!tabs) return;
-        tabs.innerHTML = '';
-        db.catOrder.forEach(cat => {
-            tabs.innerHTML += `<button class="btn-sm" style="white-space:nowrap; border-radius:20px; ${currentCat===cat?'background:var(--accent-gray);color:black':''}" onclick="currentCat='${cat}';renderBookmarkUI()">${cat}</button>`;
-        });
-        const content = document.getElementById('bookmarkContent'); if(!content) return;
-        content.innerHTML = '';
-        (db.bookmarks[currentCat] || []).forEach((b, i) => {
-            content.innerHTML += `
-                <div class="bookmark-item">
-                    <button class="bm-del-btn" onclick="delBookmarkItem(${i})">✕</button>
-                    <div class="bm-text">${b.text}</div>
-                    <span class="bm-date">${b.date || ''}</span>
-                </div>`;
-        });
-        content.scrollTop = content.scrollHeight;
+    function save() { localStorage.setItem('mega_planner_v7', JSON.stringify(db)); }
+
+    function exportJSON() {
+        const dataStr = JSON.stringify(db, null, 2);
+        const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+        const linkElement = document.createElement('a');
+        linkElement.setAttribute('href', dataUri);
+        linkElement.setAttribute('download', 'planner_backup.json');
+        linkElement.click();
     }
 
-    function toggleBookmarkManage() {
-        isManaging = !isManaging;
-        document.getElementById('bookmarkNormalUI').style.display = isManaging ? 'none' : 'flex';
-        document.getElementById('bookmarkManageUI').style.display = isManaging ? 'block' : 'none';
-        document.getElementById('manageBtn').innerText = isManaging ? "✅ 完成" : "⚙️ 管理";
-        if(isManaging) renderManageUI(); else renderBookmarkUI();
-    }
-
-    function renderManageUI() {
-        const list = document.getElementById('categoryManageList'); list.innerHTML = '';
-        db.catOrder.forEach((cat, idx) => {
-            list.innerHTML += `
-                <div style="display:flex; align-items:center; gap:10px; background:#252525; padding:10px; border-radius:8px; margin-bottom:8px;">
-                    <button class="btn-sm" onclick="moveCat(${idx}, -1)">▲</button>
-                    <button class="btn-sm" onclick="moveCat(${idx}, 1)">▼</button>
-                    <input type="text" value="${cat}" style="flex:1; background:transparent; border:1px solid #444; color:white; padding:5px; border-radius:4px;" onchange="renameCat(${idx}, this.value)">
-                    <button class="btn-sm" style="color:var(--accent-red)" onclick="deleteCat(${idx})">🗑️</button>
-                </div>`;
-        });
-    }
-
-    function addCategory() {
-        const input = document.getElementById('newCatInput');
-        const name = input.value.trim();
-        if(!name) return;
-        if(db.catOrder.includes(name)) { alert("分類名稱已存在"); return; }
-        db.catOrder.push(name);
-        db.bookmarks[name] = [];
-        input.value = '';
-        save();
-        renderManageUI();
-    }
-
-    function renameCat(idx, newName) {
-        const oldName = db.catOrder[idx]; if(!newName || oldName === newName) return;
-        db.bookmarks[newName] = db.bookmarks[oldName]; delete db.bookmarks[oldName];
-        db.catOrder[idx] = newName; if(currentCat === oldName) currentCat = newName; save(); renderManageUI();
-    }
-
-    function deleteCat(idx) {
-        if(confirm("確定刪除此分類及其所有內容？")) {
-            const name = db.catOrder[idx]; delete db.bookmarks[name]; db.catOrder.splice(idx, 1);
-            if(currentCat === name) currentCat = db.catOrder[0] || ""; save(); renderManageUI();
-        }
-    }
-
-    function moveCat(idx, dir) {
-        let t = idx + dir; if(t < 0 || t >= db.catOrder.length) return;
-        [db.catOrder[idx], db.catOrder[t]] = [db.catOrder[t], db.catOrder[idx]]; save(); renderManageUI();
-    }
-
-    function addBookmarkContent() {
-        const input = document.getElementById('bmInput'); if(!input.value.trim() || !currentCat) return;
-        if(!db.bookmarks[currentCat]) db.bookmarks[currentCat] = [];
-        db.bookmarks[currentCat].push({ date: new Date().toLocaleDateString(), text: input.value });
-        input.value = ''; save(); renderBookmarkUI();
-    }
-
-    function delBookmarkItem(idx) { if(confirm("刪除此內容？")) { db.bookmarks[currentCat].splice(idx, 1); save(); renderBookmarkUI(); }}
-
-    // --- 時間軸 ---
-    function renderJournals() {
-        const flow = document.getElementById('journalFlow'); if(!flow) return; flow.innerHTML = '';
-        const items = db.journals[activeDS] || [];
-        items.sort((a,b) => a.time.localeCompare(b.time)).forEach((j, i) => {
-            flow.innerHTML += `
-                <div class="bubble-item">
-                    <input type="time" class="time-input" value="${j.time}" onchange="updateJTime(${i}, this.value)">
-                    <div class="text-bubble">
-                        <div style="flex:1;" contenteditable="true" onblur="updateJText(${i}, this.innerText)">${j.text}</div>
-                        <button class="jn-del-btn" onclick="delJournal(${i})">✕</button>
-                    </div>
-                </div>`;
-        });
-        flow.scrollTop = flow.scrollHeight;
-    }
-
-    // --- 核心邏輯 (其餘部分保持不變) ---
-    function updateCal(date, text) { db.calendar[date] = text; save(); document.querySelectorAll(`.sync-${date}`).forEach(el => el.innerText = text); }
-    function changeWeek(dir) { const d = new Date(activeDS); d.setDate(d.getDate() + dir*7); selectDate(getDS(d), false); }
-    function changeMonth(dir) { viewMonth.setMonth(viewMonth.getMonth() + dir); renderList(); }
-    function changeDrawerMonth(dir) { drawerMonth.setMonth(drawerMonth.getMonth() + dir); renderMiniCal(); }
-    function addJournal() { const input = document.getElementById('jnInput'); if(!input.value.trim()) return; if(!db.journals[activeDS]) db.journals[activeDS] = []; db.journals[activeDS].push({ time: new Date().toTimeString().slice(0,5), text: input.value }); input.value = ''; save(); renderJournals(); }
-    function updateJTime(i, v) { db.journals[activeDS][i].time = v; save(); renderJournals(); }
-    function updateJText(i, v) { db.journals[activeDS][i].text = v; save(); }
-    function delJournal(i) { if(confirm("刪除？")){ db.journals[activeDS].splice(i,1); save(); renderJournals(); }}
-    function exportData() { const blob = new Blob([JSON.stringify(db, null, 2)], {type: 'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Backup.json`; a.click(); }
     function triggerImport() { document.getElementById('importFile').click(); }
-    function importJSON(event) { const reader = new FileReader(); reader.onload = function(e) { try { db = JSON.parse(e.target.result); save(); location.reload(); } catch (err) { alert("失敗"); } }; reader.readAsText(event.target.files[0]); }
-
-    function selectDate(ds, autoSwitch = true) {
-        activeDS = ds; const d = new Date(ds);
-        document.getElementById('activeDateDisplay').innerText = `${d.getMonth()+1}月${d.getDate()}日 週${weekDaysShort[d.getDay()]}`;
-        renderWeek(); renderMiniCal(); renderList(); renderJournals();
-        if(autoSwitch && window.innerWidth < 768) switchPanel(3);
+    function importJSON(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                if (importedData.calendar && importedData.journals) {
+                    if (confirm("匯入將覆蓋現有資料，確定嗎？")) {
+                        db = importedData; save(); location.reload();
+                    }
+                }
+            } catch (err) { alert("讀取失敗。"); }
+        };
+        reader.readAsText(file);
     }
 
-    function goToday() {
-        const today = new Date(); const dsToday = getDS(today);
-        viewMonth = new Date(today); drawerMonth = new Date(today);
-        selectDate(dsToday, false);
+    function switchPanel(index) {
+        const isDesktop = window.innerWidth >= 768;
+        
+        if (isDesktop) {
+            // 桌面版：只切換左側面板
+            const weekPanel = document.getElementById('weekPanel');
+            const listPanel = document.getElementById('listPanel');
+            
+            weekPanel.classList.remove('active-left');
+            listPanel.classList.remove('active-left');
+            
+            if (index === 0) {
+                weekPanel.classList.add('active-left');
+            } else if (index === 1) {
+                listPanel.classList.add('active-left');
+            }
+            // index === 2 (時間軸) 在桌面版不處理，因為右側固定顯示
+        } else {
+            // 手機版：滑動切換
+            const container = document.getElementById('mainContainer');
+            container.style.transform = `translateX(-${index * 100}vw)`;
+        }
+        
+        // 更新導航按鈕狀態
+        document.querySelectorAll('.nav-item').forEach((btn, i) => {
+            btn.classList.toggle('active', i === index);
+        });
+    }
+
+    function toggleCalendar() {
+        const drawer = document.getElementById('calDrawer');
+        const arrow = document.getElementById('drawerArrow');
+        isCalExpanded = !isCalExpanded;
+        drawer.classList.toggle('expanded', isCalExpanded);
+        drawer.classList.toggle('collapsed', !isCalExpanded);
+        arrow.innerHTML = isCalExpanded ? ' <span style="font-family:monospace;font-style:normal;">▲</span>' : ' <span style="font-family:monospace;font-style:normal;">▼</span>';
+        renderMiniCalendar();
+    }
+
+    function goToday(shouldSwitchPanel) {
+        const todayStr = getTWDateString();
+        const todayObj = new Date();
+        activeDateStr = todayStr;
+        viewDate = new Date(todayObj.getFullYear(), todayObj.getMonth(), 1);
+        selectDate(activeDateStr, shouldSwitchPanel);
         setTimeout(() => {
-            const el = document.getElementById(`list-${dsToday}`);
+            const el = document.getElementById(`row-${activeDateStr}`);
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 150);
     }
 
-    function switchPanel(idx) {
-        if (window.innerWidth < 768) {
-            document.getElementById('mainContainer').style.transform = `translateX(-${idx * 100}vw)`;
-        } else {
-            ['weekPanel', 'listPanel', 'bookmarkPanel'].forEach((id, i) => {
-                const el = document.getElementById(id); if(el) el.classList.toggle('active-left', i === idx);
-            });
-        }
-        document.querySelectorAll('.nav-item').forEach((b, i) => b.classList.toggle('active', i === idx));
-        if(idx === 0) renderWeek(); if(idx === 1) renderList(); if(idx === 2) renderBookmarkUI();
-    }
-
-    function toggleCalendar() {
-        isCalExpanded = !isCalExpanded;
-        const drawer = document.getElementById('calDrawer');
-        drawer.classList.toggle('expanded', isCalExpanded);
-        drawer.classList.toggle('collapsed', !isCalExpanded);
-        document.getElementById('drawerArrow').innerText = isCalExpanded ? " ▲" : " ▼";
-        renderMiniCal();
-    }
-
-    function renderMiniCal() {
-        const grid = document.getElementById('miniCalGrid'); if(!grid) return; grid.innerHTML = '';
-        ['一','二','三','四','五','六','日'].forEach(l => grid.innerHTML += `<div style="font-size:0.75rem; color:#888;">${l}</div>`);
-        const y = drawerMonth.getFullYear(), m = drawerMonth.getMonth();
-        document.getElementById('miniMonthTitle').innerText = `${monthNames[m]} ${y}`;
-        if (isCalExpanded) {
-            let firstDay = new Date(y, m, 1).getDay(); firstDay = (firstDay === 0) ? 6 : firstDay - 1; 
-            const lastDate = new Date(y, m+1, 0).getDate();
-            for(let i=0; i<firstDay; i++) grid.innerHTML += `<div></div>`;
-            for(let d=1; d<=lastDate; d++) {
-                const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                const isWeekend = (new Date(ds).getDay() === 0 || new Date(ds).getDay() === 6);
-                grid.innerHTML += `<div class="cal-date ${ds===activeDS?'selected':''} ${isWeekend?'is-weekend':''}" onclick="selectDate('${ds}')">${d}</div>`;
-            }
-        } else {
-            const curr = new Date(activeDS); const diff = (curr.getDay() === 0 ? -6 : 1 - curr.getDay());
-            const start = new Date(curr); start.setDate(curr.getDate() + diff);
-            for(let i=0; i<7; i++) {
-                const d = new Date(start); d.setDate(start.getDate() + i); const ds = getDS(d);
-                grid.innerHTML += `<div class="cal-date ${ds===activeDS?'selected':''} ${ (d.getDay()===0||d.getDay()===6)?'is-weekend':''}" onclick="selectDate('${ds}')">${d.getDate()}</div>`;
-            }
-        }
-    }
-
-    function renderWeek() {
-        const grid = document.getElementById('weekGrid'); if(!grid) return; grid.innerHTML = '';
-        const curr = new Date(activeDS); const day = curr.getDay();
-        const diff = (day === 0 ? -6 : 1 - day);
-        const start = new Date(curr); start.setDate(curr.getDate() + diff);
-        document.getElementById('weekTitle').innerText = `${start.getFullYear()} / ${start.getMonth()+1}月`;
-        for(let i=0; i<7; i++) {
-            const d = new Date(start); d.setDate(start.getDate() + i); const ds = getDS(d);
-            const isWeekend = (d.getDay() === 0 || d.getDay() === 6);
-            grid.innerHTML += `
-                <div class="week-card ${ds===getDS(new Date())?'today':''}">
-                    <div class="week-day-title" onclick="selectDate('${ds}')" style="cursor:pointer">
-                        <span style="color:${isWeekend?'var(--accent-red)':'white'}">${d.getMonth()+1}/${d.getDate()} (${weekDaysShort[d.getDay()]})</span>
-                    </div>
-                    <div class="week-day-content sync-${ds}" contenteditable="true" onblur="updateCal('${ds}', this.innerText)">${db.calendar[ds]||''}</div>
-                </div>`;
+    function selectDate(dateStr, autoSwitch = true) {
+        activeDateStr = dateStr;
+        const d = new Date(dateStr);
+        const weekDay = ["日", "一", "二", "三", "四", "五", "六"][d.getDay()];
+        document.getElementById('selectedDateTitle').innerText = `${d.getMonth()+1}月${d.getDate()}日 週${weekDay}`;
+        renderList();
+        renderMiniCalendar();
+        renderJournals();
+        if (autoSwitch && window.innerWidth < 768) {
+            // 如果已在時間軸，留在時間軸；否則跳到行事曆
+            const currentPanel = document.querySelector('.nav-item.active');
+            const currentIndex = [...document.querySelectorAll('.nav-item')].indexOf(currentPanel);
+            switchPanel(currentIndex === 2 ? 2 : 1);
         }
     }
 
     function renderList() {
-        const list = document.getElementById('calendarList'); if(!list) return; list.innerHTML = '';
-        const y = viewMonth.getFullYear(), m = viewMonth.getMonth();
-        document.getElementById('monthTitle').innerText = `${monthNames[m]} ${y}`;
-        const lastDay = new Date(y, m+1, 0).getDate();
-        for(let d=1; d<=lastDay; d++) {
-            const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const list = document.getElementById('calendarList');
+        list.innerHTML = '';
+        const year = viewDate.getFullYear();
+        const month = viewDate.getMonth();
+        const mStr = `${monthNames[month]} ${year}`;
+        document.getElementById('currentMonth').innerText = mStr;
+        document.getElementById('miniMonthTitle').innerText = mStr;
+        
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        for(let d=1; d<=daysInMonth; d++) {
+            const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
             const dateObj = new Date(ds);
             const isWeekend = (dateObj.getDay() === 0 || dateObj.getDay() === 6);
-            list.innerHTML += `
-                <div class="day-row ${ds === activeDS?'selected':''}" id="list-${ds}" onclick="selectDate('${ds}', false)">
-                    <div class="day-num-box">
-                        <div class="day-num ${isWeekend?'is-weekend-text':''}">${d}</div>
-                        <div class="day-weekday ${isWeekend?'is-weekend-text':''}">${weekDaysShort[dateObj.getDay()]}</div>
-                    </div>
-                    <div class="day-content sync-${ds}" contenteditable="true" onblur="updateCal('${ds}', this.innerText)">${db.calendar[ds]||''}</div>
-                </div>`;
+            const row = document.createElement('div');
+            row.className = `day-row ${ds === activeDateStr ? 'selected' : ''}`;
+            row.id = `row-${ds}`;
+            row.innerHTML = `<div class="day-num" style="color: ${isWeekend ? '#ff453a' : '#fff'}">${d}<br><small style="opacity:0.5">${["日","一","二","三","四","五","六"][dateObj.getDay()]}</small></div>
+                            <div class="day-content" contenteditable="true" oninput="updateCalRealtime('${ds}', this.innerText)" onblur="updateCal('${ds}', this.innerText)">${db.calendar[ds] || ''}</div>`;
+            row.onclick = (e) => { if(e.target.className !== 'day-content') selectDate(ds); };
+            list.appendChild(row);
         }
     }
 
-    window.onload = () => { goToday(); if(window.innerWidth >= 768) switchPanel(0); };
-</script>
-</body>
+    function renderMiniCalendar() {
+        const grid = document.getElementById('miniCalGrid');
+        grid.innerHTML = '';
+        ['一','二','三','四','五','六','日'].forEach(l => grid.innerHTML += `<div class="cal-head">${l}</div>`);
+        const year = viewDate.getFullYear();
+        const month = viewDate.getMonth();
 
+        if (isCalExpanded) {
+            let firstDay = new Date(year, month, 1).getDay();
+            firstDay = (firstDay === 0) ? 6 : firstDay - 1;
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            for(let i=0; i<firstDay; i++) grid.innerHTML += '<div></div>';
+            for(let d=1; d<=daysInMonth; d++) {
+                const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const dateObj = new Date(ds);
+                const isWeekend = (dateObj.getDay() === 0 || dateObj.getDay() === 6);
+                grid.innerHTML += `<div class="cal-date ${ds === activeDateStr ? 'selected' : ''} ${isWeekend ? 'is-weekend' : ''}" onclick="selectDate('${ds}')">${d}</div>`;
+            }
+        } else {
+            const curr = new Date(activeDateStr);
+            let dayOffset = (curr.getDay() === 0) ? 6 : curr.getDay() - 1;
+            const startOfRow = new Date(curr);
+            startOfRow.setDate(curr.getDate() - dayOffset);
+            for(let i=0; i<7; i++) {
+                const d = new Date(startOfRow);
+                d.setDate(startOfRow.getDate() + i);
+                const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                const isWeekend = (d.getDay() === 0 || d.getDay() === 6);
+                grid.innerHTML += `<div class="cal-date ${ds === activeDateStr ? 'selected' : ''} ${isWeekend ? 'is-weekend' : ''} ${d.getMonth() !== month ? 'other-month' : ''}" onclick="selectDate('${ds}')">${d.getDate()}</div>`;
+            }
+        }
+    }
+
+    function renderJournals() {
+        const group = document.getElementById('bubbleGroup'); group.innerHTML = '';
+        const items = db.journals[activeDateStr] || [];
+        items.sort((a,b) => a.time.localeCompare(b.time));
+        items.forEach((item, index) => {
+            group.innerHTML += `
+                <div class="bubble-item">
+                    <input type="time" class="time-tag" value="${item.time}" onblur="updateJournalTime(${index}, this.value)">
+                    <div class="text-bubble" contenteditable="true" onblur="updateJournalText(${index}, this.innerText)">${item.text}</div>
+                    <button class="del-journal-btn" onclick="deleteJournal(${index})">🗑️</button>
+                </div>`;
+        });
+        const flow = document.getElementById('journalFlow');
+        setTimeout(() => { flow.scrollTop = flow.scrollHeight; }, 50);
+    }
+
+    function addJournal() {
+        const input = document.getElementById('newJournalInput');
+        if (!input.value.trim()) return;
+        const now = new Date();
+        const time = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+        if (!db.journals[activeDateStr]) db.journals[activeDateStr] = [];
+        db.journals[activeDateStr].push({ time, text: input.value });
+        input.value = ''; save(); renderJournals();
+    }
+
+    function deleteJournal(index) {
+        if(confirm("確定要刪除這條筆記嗎？")) {
+            db.journals[activeDateStr].splice(index, 1);
+            save(); renderJournals();
+        }
+    }
+
+    function updateCal(date, text) { 
+        db.calendar[date] = text; 
+        save(); 
+        
+        // 同步更新週曆視圖
+        const weekContent = document.querySelector(`#weekGrid .week-day-content[onblur*="${date}"]`);
+        if (weekContent && weekContent.innerText !== text) {
+            weekContent.innerText = text;
+        }
+        
+        // 同步更新行事曆視圖
+        const listContent = document.querySelector(`#row-${date} .day-content`);
+        if (listContent && listContent.innerText !== text) {
+            listContent.innerText = text;
+        }
+    }
+    
+    function updateCalRealtime(date, text) {
+        // 即時同步顯示（不儲存，等 blur 時才儲存）
+        const weekContent = document.querySelector(`#weekGrid .week-day-content[onblur*="${date}"]`);
+        if (weekContent && document.activeElement !== weekContent) {
+            weekContent.innerText = text;
+        }
+        
+        const listContent = document.querySelector(`#row-${date} .day-content`);
+        if (listContent && document.activeElement !== listContent) {
+            listContent.innerText = text;
+        }
+    }
+    function updateJournalTime(idx, val) { db.journals[activeDateStr][idx].time = val; save(); renderJournals(); }
+    function updateJournalText(idx, val) { db.journals[activeDateStr][idx].text = val; save(); }
+    function changeMonth(offset) { viewDate.setMonth(viewDate.getMonth() + offset); renderList(); renderMiniCalendar(); }
+
+    // --- 週曆功能 ---
+    function getWeekStart(date) {
+        const d = new Date(date);
+        const day = d.getDay();
+        const diff = day === 0 ? -6 : 1 - day; // 週一為起始
+        d.setDate(d.getDate() + diff);
+        return d;
+    }
+
+    function getWeekNumber(date) {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+        const yearStart = new Date(d.getFullYear(), 0, 1);
+        return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    }
+
+    function changeWeek(offset) {
+        weekStartDate.setDate(weekStartDate.getDate() + (offset * 7));
+        renderWeekView();
+    }
+
+    function renderWeekView() {
+        const grid = document.getElementById('weekGrid');
+        grid.innerHTML = '';
+        
+        const start = getWeekStart(weekStartDate);
+        const weekNum = getWeekNumber(start);
+        const year = start.getFullYear();
+        
+        document.getElementById('weekTitle').innerText = `${year} 年第 ${weekNum} 週`;
+        
+        const today = getTWDateString();
+        const dayNames = ['週一', '週二', '週三', '週四', '週五', '週六', '週日'];
+        
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(start);
+            d.setDate(start.getDate() + i);
+            const ds = getTWDateString(d);
+            const isToday = ds === today;
+            const isWeekend = (i === 5 || i === 6);
+            
+            const card = document.createElement('div');
+            card.className = `week-day-card ${isToday ? 'today' : ''}`;
+            card.innerHTML = `
+                <div class="week-day-header">
+                    <span style="color: ${isWeekend ? '#ff453a' : '#fff'}">${dayNames[i]}</span>
+                    <span class="week-day-date">${d.getMonth()+1}/${d.getDate()}</span>
+                </div>
+                <div class="week-day-content" 
+                     contenteditable="true" 
+                     oninput="updateCalRealtime('${ds}', this.innerText)"
+                     onblur="updateCal('${ds}', this.innerText)"
+                     onclick="event.stopPropagation()">${db.calendar[ds] || ''}</div>
+            `;
+            card.onclick = (e) => {
+                if (!e.target.classList.contains('week-day-content')) {
+                    selectDate(ds);
+                }
+            };
+            grid.appendChild(card);
+        }
+    }
+
+    // --- 旋轉視窗（只在 Electron 桌面版有效）---
+    function toggleOrientation() {
+        if (window.electronAPI) {
+            const btn = document.getElementById('orientationBtn');
+            btn.classList.add('spin');
+            setTimeout(() => btn.classList.remove('spin'), 400);
+            window.electronAPI.toggleOrientation();
+        }
+    }
+
+
+    // ===== 書籤功能 =====
+    let activeBmCat = '全部';
+
+    function renderBmCategories() {
+        const filter = document.getElementById('bmCatFilter');
+        const select = document.getElementById('bmCatSelect');
+        const cats = db.bmCategories;
+        filter.innerHTML = `<button class="bm-cat-btn ${activeBmCat === '全部' ? 'active' : ''}" onclick="filterBmCat('全部')">全部</button>`;
+        cats.forEach(c => {
+            filter.innerHTML += `<button class="bm-cat-btn ${activeBmCat === c ? 'active' : ''}" onclick="filterBmCat('${c}')">${c}</button>`;
+        });
+        filter.innerHTML += `<button class="bm-cat-btn cat-manage" onclick="openCatModal()">＋ 分類</button>`;
+        select.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+
+    function filterBmCat(cat) {
+        activeBmCat = cat;
+        renderBmCategories();
+        renderBookmarks();
+    }
+
+    function renderBookmarks() {
+        const list = document.getElementById('bmList');
+        const items = activeBmCat === '全部'
+            ? db.bookmarks
+            : db.bookmarks.filter(b => b.cat === activeBmCat);
+        if (items.length === 0) {
+            list.innerHTML = '<div style="color:#444;text-align:center;margin-top:40px;font-size:0.9rem;">還沒有書籤，快來記下第一條！</div>';
+            return;
+        }
+        list.innerHTML = items.map((b) => {
+            const realIndex = db.bookmarks.indexOf(b);
+            return `<div class="bm-card">
+                <div class="bm-card-cat">${b.cat}</div>
+                <div class="bm-card-text" contenteditable="true" onblur="updateBookmark(${realIndex}, this.innerText)">${b.text}</div>
+                <button class="bm-card-del" onclick="deleteBookmark(${realIndex})">✕</button>
+            </div>`;
+        }).join('');
+    }
+
+    function addBookmark() {
+        const text = document.getElementById('bmTextInput').value.trim();
+        const cat = document.getElementById('bmCatSelect').value;
+        if (!text) return;
+        db.bookmarks.unshift({ cat, text });
+        document.getElementById('bmTextInput').value = '';
+        save(); renderBookmarks();
+    }
+
+    function updateBookmark(index, text) {
+        db.bookmarks[index].text = text;
+        save();
+    }
+
+    function deleteBookmark(index) {
+        if (confirm('確定刪除這條書籤？')) {
+            db.bookmarks.splice(index, 1);
+            save(); renderBookmarks();
+        }
+    }
+
+    function openCatModal() {
+        renderCatModal();
+        document.getElementById('bmModalOverlay').style.display = 'flex';
+    }
+
+    function closeCatModal() {
+        document.getElementById('bmModalOverlay').style.display = 'none';
+        renderBmCategories();
+        renderBookmarks();
+    }
+
+    function renderCatModal() {
+        const el = document.getElementById('bmModalCats');
+        el.innerHTML = db.bmCategories.map((c, i) => `
+            <div class="bm-modal-cat-row">
+                <span class="bm-modal-cat-name">${c}</span>
+                <button class="bm-modal-cat-del" onclick="deleteCategory(${i})">✕</button>
+            </div>`).join('');
+    }
+
+    function addCategory() {
+        const input = document.getElementById('bmNewCatInput');
+        const name = input.value.trim();
+        if (!name || db.bmCategories.includes(name)) return;
+        db.bmCategories.push(name);
+        input.value = '';
+        save(); renderCatModal(); renderBmCategories();
+    }
+
+    function deleteCategory(index) {
+        const name = db.bmCategories[index];
+        if (confirm(`刪除分類「${name}」？\n（該分類的書籤不會被刪除）`)) {
+            db.bmCategories.splice(index, 1);
+            save(); renderCatModal(); renderBmCategories();
+        }
+    }
+
+    window.onload = () => {
+        // 如果是在 Electron 中執行,才顯示旋轉按鈕
+        if (window.electronAPI) {
+            document.getElementById('orientationBtn').style.display = 'flex';
+            // 監聽方向改變，更新按鈕 tooltip
+            window.electronAPI.onOrientationChanged((orientation) => {
+                const btn = document.getElementById('orientationBtn');
+                btn.title = orientation === 'portrait' ? '切換為橫式' : '切換為直式';
+            });
+        }
+        weekStartDate = getWeekStart(new Date());
+        selectDate(activeDateStr, false);
+        renderWeekView();
+        renderBmCategories();
+        renderBookmarks();
+        
+        // 初始化桌面版佈局
+        if (window.innerWidth >= 768) {
+            document.getElementById('weekPanel').classList.add('active-left');
+        }
+    };
+</script>
+
+<!-- 書籤分類管理 -->
+<div class="bm-modal-overlay" id="bmModalOverlay" style="display:none" onclick="if(event.target===this)closeCatModal()">
+    <div class="bm-modal">
+        <h3>管理分類</h3>
+        <div class="bm-modal-cats" id="bmModalCats"></div>
+        <div class="bm-modal-add-row">
+            <input class="bm-modal-input" id="bmNewCatInput" placeholder="新增分類名稱..." onkeypress="if(event.key==='Enter')addCategory()">
+            <button class="bm-modal-confirm" onclick="addCategory()">新增</button>
+        </div>
+        <button class="bm-modal-close" onclick="closeCatModal()">完成</button>
+    </div>
+</div>
+
+</body>
 </html>
