@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Kinia's Planner v2</title>
-
-    <link rel="apple-touch-icon" href="icon.png">
     
     <style>
         :root {
@@ -44,30 +42,33 @@
 
         .btn-sm { background: #252525; color: white; border: 1px solid #444; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; }
 
+        /* --- 輸入列通用的 z-index 與指標處理 --- */
+        .input-bar { 
+            padding: 12px; background: #000; border-top: 1px solid var(--border); 
+            display: flex; gap: 8px; align-items: center; 
+            position: relative; z-index: 10;
+        }
+        .input-bar input[type="text"] { 
+            flex: 1; background: #2c2c2e; border: none; border-radius: 20px; 
+            padding: 10px 18px; color: white; outline: none; 
+            pointer-events: auto; /* 確保可被點擊 */
+        }
+        .add-circle { 
+            background: var(--accent-gray); color: black; width: 42px; height: 42px; 
+            border-radius: 50%; border: none; font-size: 1.6rem; cursor: pointer; 
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0; 
+        }
+
         /* --- 時間軸區域 --- */
         .journal-flow { flex: 1; overflow-y: auto; padding: 20px; }
-        .input-bar { padding: 12px; background: #000; border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: center; }
-        
         .input-bar input[type="time"] {
             background: #2c2c2e; border: 1px solid #444; color: var(--accent-gray);
             border-radius: 12px; padding: 8px; font-size: 0.85rem; outline: none; width: 95px;
         }
+        .input-bar input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(88%); cursor: pointer; }
 
-        .input-bar input[type="time"]::-webkit-calendar-picker-indicator {
-            filter: invert(88%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(100%) contrast(90%);
-            cursor: pointer;
-        }
-
-        .input-bar input[type="text"] { flex: 1; background: #2c2c2e; border: none; border-radius: 20px; padding: 10px 18px; color: white; outline: none; }
-        .add-circle { background: var(--accent-gray); color: black; width: 42px; height: 42px; border-radius: 50%; border: none; font-size: 1.6rem; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-
-        /* --- 時間軸氣泡樣式修正 (置中優化) --- */
-        .bubble-item { 
-            display: flex; 
-            gap: 12px; 
-            margin-bottom: 15px; 
-            align-items: center; /* 讓時間輸入框與整個氣泡垂直置中 */
-        }
+        /* --- 時間軸氣泡樣式 (置中優化) --- */
+        .bubble-item { display: flex; gap: 12px; margin-bottom: 15px; align-items: center; }
         .time-input { 
             background: #252525; border: 1px solid rgba(176,176,176,0.3); color: var(--text-gray); 
             border-radius: 8px; padding: 6px 4px 6px 8px; font-size: 0.85rem; outline: none; 
@@ -77,8 +78,7 @@
         
         .text-bubble { 
             background: #2c2c2e; padding: 12px 16px; border-radius: 18px; 
-            flex: 1; display: flex; align-items: center; /* 讓內部文字與 X 按鈕垂直置中 */
-            gap: 10px; position: relative; color: white; min-height: 44px;
+            flex: 1; display: flex; align-items: center; gap: 10px; position: relative; color: white; min-height: 44px;
         }
         .text-bubble div[contenteditable="true"] {
             flex: 1; outline: none; word-break: break-all; cursor: text; line-height: 1.4;
@@ -87,6 +87,13 @@
             background: none; border: none; color: #888; font-size: 1.1rem; 
             cursor: pointer; padding: 0 5px; display: flex; align-items: center; justify-content: center;
         }
+
+        /* --- 書籤面板特定樣式 --- */
+        .bookmark-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 12px; background: #1a1a1a; border-bottom: 1px solid #333; scrollbar-width: none; }
+        .bookmark-item { background: var(--bm-card); border-radius: 10px; padding: 14px; margin-bottom: 12px; border: 1px solid #333; border-left: 4px solid var(--accent-gray); position: relative; }
+        .bm-text { font-size: 1rem; color: #eee; line-height: 1.6; margin-bottom: 8px; word-break: break-all; }
+        .bm-date { font-size: 0.75rem; color: #666; text-align: right; display: block; }
+        .bm-del-btn { position: absolute; top: 8px; right: 8px; background: none; border: none; color: #555; cursor: pointer; }
 
         /* --- 行事曆 & 週曆 --- */
         .list-view { flex: 1; overflow-y: auto; scroll-behavior: smooth; background: var(--bg-dark); }
@@ -112,12 +119,6 @@
         .cal-date { padding: 8px 0; border-radius: 6px; cursor: pointer; font-size: 0.9rem; width: 85%; margin: 0 auto; }
         .cal-date.selected { background: var(--accent-gray); color: #000; font-weight: bold; }
         .cal-date.is-weekend { color: var(--accent-red); }
-
-        .bookmark-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 12px; background: #1a1a1a; border-bottom: 1px solid #333; scrollbar-width: none; }
-        .bookmark-item { background: var(--bm-card); border-radius: 10px; padding: 14px; margin-bottom: 12px; border: 1px solid #333; border-left: 4px solid var(--accent-gray); position: relative; }
-        .bm-text { font-size: 1rem; color: #eee; line-height: 1.6; margin-bottom: 8px; word-break: break-all; }
-        .bm-date { font-size: 0.75rem; color: #666; text-align: right; display: block; }
-        .bm-del-btn { position: absolute; top: 8px; right: 8px; background: none; border: none; color: #555; cursor: pointer; }
 
         .nav-bar { position: fixed; bottom: 0; width: 100vw; height: 60px; background: #000; border-top: 1px solid var(--border); display: flex; z-index: 1000; }
         .nav-item { flex: 1; border: none; background: none; color: var(--text-gray); font-size: 0.9rem; cursor: pointer; }
@@ -225,7 +226,7 @@
     const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
     const weekDaysShort = ['日', '一', '二', '三', '四', '五', '六'];
 
-    // --- 時間軸渲染與排版修復 ---
+    // --- 時間軸渲染與排版 ---
     function renderJournals() {
         const flow = document.getElementById('journalFlow'); if(!flow) return; 
         const items = db.journals[activeDS] || [];
@@ -246,7 +247,8 @@
 
     function updateInputTime() {
         const now = new Date();
-        document.getElementById('jnTimeInput').value = now.toTimeString().slice(0,5);
+        const el = document.getElementById('jnTimeInput');
+        if(el) el.value = now.toTimeString().slice(0,5);
     }
 
     function addJournal() {
@@ -258,16 +260,12 @@
         input.value = ''; save(); renderJournals(); updateInputTime();
     }
 
-    // --- 共用與導覽功能 ---
+    // --- 共用導覽與功能 ---
     function selectDate(ds, autoSwitch = true) {
         activeDS = ds; const d = new Date(ds);
         document.getElementById('activeDateDisplay').innerText = `${d.getMonth()+1}月${d.getDate()}日 週${weekDaysShort[d.getDay()]}`;
         renderWeek(); renderMiniCal(); renderList(); renderJournals();
-        if(autoSwitch && window.innerWidth < 768) {
-            // 手機版：若目前在時間軸就留著，否則跳到時間軸
-            const currentIdx = [...document.querySelectorAll('.nav-item')].findIndex(b => b.classList.contains('active'));
-            if(currentIdx !== 3) switchPanel(3);
-        }
+        if(autoSwitch && window.innerWidth < 768) switchPanel(3);
     }
     function updateCal(date, text) { db.calendar[date] = text; save(); document.querySelectorAll(`.sync-${date}`).forEach(el => el.innerText = text); }
     function changeWeek(dir) { const d = new Date(activeDS); d.setDate(d.getDate() + dir*7); selectDate(getDS(d), false); }
@@ -281,9 +279,7 @@
     function importJSON(event) { const reader = new FileReader(); reader.onload = function(e) { try { db = JSON.parse(e.target.result); save(); location.reload(); } catch (err) { alert("失敗"); } }; reader.readAsText(event.target.files[0]); }
     
     function goToday() { 
-        const today = new Date(); 
-        viewMonth = new Date(today); 
-        drawerMonth = new Date(today); 
+        const today = new Date(); viewMonth = new Date(today); drawerMonth = new Date(today); 
         selectDate(getDS(today), false); 
         setTimeout(() => {
             const el = document.getElementById(`list-${getDS(today)}`);
@@ -292,23 +288,10 @@
     }
     
     function switchPanel(idx) {
-        if (window.innerWidth < 768) {
-            document.getElementById('mainContainer').style.transform = `translateX(-${idx * 100}vw)`;
-        } else {
-            // 桌面版：0=週曆、1=行事曆、2=書籤 顯示在左側，3=時間軸固定右側
-            const leftPanels = ['weekPanel', 'listPanel', 'bookmarkPanel'];
-            if (idx <= 2) {
-                leftPanels.forEach((id, i) => {
-                    const el = document.getElementById(id);
-                    if(el) el.classList.toggle('active-left', i === idx);
-                });
-            }
-            // idx===3（時間軸）不動左側面板，保持現狀
-        }
+        if (window.innerWidth < 768) document.getElementById('mainContainer').style.transform = `translateX(-${idx * 100}vw)`;
+        else { ['weekPanel', 'listPanel', 'bookmarkPanel'].forEach((id, i) => { const el = document.getElementById(id); if(el) el.classList.toggle('active-left', i === idx); }); }
         document.querySelectorAll('.nav-item').forEach((b, i) => b.classList.toggle('active', i === idx));
-        if(idx === 0) renderWeek();
-        if(idx === 1) renderList();
-        if(idx === 2) renderBookmarkUI();
+        if(idx === 0) renderWeek(); if(idx === 1) renderList(); if(idx === 2) renderBookmarkUI();
     }
 
     function toggleCalendar() {
@@ -378,7 +361,7 @@
         }
     }
 
-    // --- 書籤功能 ---
+    // --- 書籤功能修復 ---
     function renderBookmarkUI() {
         if(isManaging) { renderManageUI(); return; }
         const tabs = document.getElementById('bookmarkTabs'); if(!tabs) return;
@@ -431,6 +414,7 @@
     }
     function addBookmarkContent() {
         const input = document.getElementById('bmInput'); if(!input.value.trim() || !currentCat) return;
+        if(!db.bookmarks[currentCat]) db.bookmarks[currentCat] = [];
         db.bookmarks[currentCat].push({ date: new Date().toLocaleDateString(), text: input.value });
         input.value = ''; save(); renderBookmarkUI();
     }
