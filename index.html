@@ -109,7 +109,7 @@
         /* 書籤樣式 */
         .bookmark-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 12px; background: #1a1a1a; border-bottom: 1px solid #333; scrollbar-width: none; }
         .bookmark-item { background: var(--bm-card); border-radius: 10px; padding: 14px; margin-bottom: 12px; border: 1px solid #333; border-left: 4px solid var(--accent-gray); position: relative; }
-        .bm-text { font-size: 1rem; color: #eee; line-height: 1.6; margin-bottom: 8px; word-break: break-all; }
+        .bm-text { font-size: 1rem; color: #eee; line-height: 1.6; margin-bottom: 8px; word-break: break-word; white-space: pre-wrap; }
         .bm-date { font-size: 0.75rem; color: #666; text-align: right; display: block; }
         .bm-del-btn { position: absolute; top: 8px; right: 8px; background: none; border: none; color: #555; cursor: pointer; }
 
@@ -391,6 +391,26 @@
         }
     }
 
+    function linkify(text) {
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        const parts = text.split(urlRegex);
+        const frag = document.createDocumentFragment();
+        parts.forEach(part => {
+            if (/^https?:\/\//.test(part)) {
+                const a = document.createElement('a');
+                a.href = part;
+                a.textContent = part;
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                a.style.cssText = 'color:#64b5f6;word-break:break-all;text-decoration:none;border-bottom:1px solid rgba(100,181,246,0.35);';
+                frag.appendChild(a);
+            } else if (part) {
+                frag.appendChild(document.createTextNode(part));
+            }
+        });
+        return frag;
+    }
+
     function renderBookmarkUI() {
         if(isManaging) { renderManageUI(); return; }
         const tabs = document.getElementById('bookmarkTabs'); if(!tabs) return;
@@ -401,7 +421,22 @@
         const content = document.getElementById('bookmarkContent'); if(!content) return;
         content.innerHTML = '';
         (db.bookmarks[currentCat] || []).forEach((b, i) => {
-            content.innerHTML += `<div class="bookmark-item"><button class="bm-del-btn" onclick="delBookmarkItem(${i})">✕</button><div class="bm-text">${b.text}</div><span class="bm-date">${b.date || ''}</span></div>`;
+            const item = document.createElement('div');
+            item.className = 'bookmark-item';
+            const delBtn = document.createElement('button');
+            delBtn.className = 'bm-del-btn';
+            delBtn.textContent = '✕';
+            delBtn.onclick = () => delBookmarkItem(i);
+            const textDiv = document.createElement('div');
+            textDiv.className = 'bm-text';
+            textDiv.appendChild(linkify(b.text));
+            const dateSpan = document.createElement('span');
+            dateSpan.className = 'bm-date';
+            dateSpan.textContent = b.date || '';
+            item.appendChild(delBtn);
+            item.appendChild(textDiv);
+            item.appendChild(dateSpan);
+            content.appendChild(item);
         });
         content.scrollTop = content.scrollHeight;
     }
