@@ -79,7 +79,7 @@
             background: #2c2c2e; padding: 12px 16px; border-radius: 18px; 
             flex: 1; display: flex; align-items: center; gap: 10px; position: relative; color: white; min-height: 44px;
         }
-        .text-bubble div[contenteditable="true"] { flex: 1; outline: none; word-break: break-all; cursor: text; line-height: 1.4; }
+        .text-bubble div[contenteditable="true"] { flex: 1; outline: none; word-break: break-word; white-space: pre-wrap; cursor: text; line-height: 1.4; }
         .jn-del-btn { background: none; border: none; color: #888; font-size: 1.1rem; cursor: pointer; padding: 0 5px; display: flex; align-items: center; }
 
         /* 輸入列佈局 */
@@ -93,9 +93,10 @@
             display: none;
         }
 
-        .input-bar input[type="text"] { 
+        .input-bar input[type="text"], .input-bar textarea { 
             flex: 1; background: #2c2c2e; border: none; border-radius: 20px; 
-            padding: 10px 18px; color: white; outline: none; 
+            padding: 10px 18px; color: white; outline: none; font-family: inherit; font-size: 1rem;
+            resize: none; overflow: hidden; min-height: 42px; max-height: 120px; line-height: 1.4;
         }
         .add-circle { 
             background: var(--accent-gray); color: black; width: 42px; height: 42px; 
@@ -225,7 +226,7 @@
             <div class="bookmark-tabs" id="bookmarkTabs"></div>
             <div class="journal-flow" id="bookmarkContent" style="padding:15px;"></div>
             <div class="input-bar">
-                <input type="text" id="bmInput" placeholder="新增書籤內容..." onkeypress="if(event.key==='Enter') addBookmarkContent()">
+                <textarea id="bmInput" placeholder="新增書籤內容..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addBookmarkContent();}" oninput="autoResize(this)"></textarea>
                 <button class="add-circle" onclick="addBookmarkContent()">+</button>
             </div>
         </div>
@@ -263,7 +264,7 @@
         <div class="journal-flow" id="journalFlow"></div>
         <div class="input-bar">
             <input type="time" id="jnTimeInput" style="background:#2c2c2e; border:1px solid #444; color:white; border-radius:12px; padding:8px; width:72px; outline:none; -webkit-appearance:none; appearance:none; text-align:center;">
-            <input type="text" id="jnInput" placeholder="記錄此時此刻..." onkeypress="if(event.key==='Enter') addJournal()">
+            <textarea id="jnInput" placeholder="記錄此時此刻..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addJournal();}" oninput="autoResize(this)"></textarea>
             <button class="add-circle" onclick="addJournal()">+</button>
         </div>
     </div>
@@ -335,7 +336,7 @@
         if(!input.value.trim()) return;
         if(!db.journals[activeDS]) db.journals[activeDS] = [];
         db.journals[activeDS].push({ time: timeInput.value || new Date().toTimeString().slice(0,5), text: input.value });
-        input.value = ''; save(); renderJournals(); updateInputTime();
+        input.value = ''; input.style.height = '42px'; save(); renderJournals(); updateInputTime();
     }
 
     // --- 日期與導覽 ---
@@ -554,7 +555,7 @@
         const input = document.getElementById('bmInput'); if(!input.value.trim() || !currentCat) return;
         if(!db.bookmarks[currentCat]) db.bookmarks[currentCat] = [];
         db.bookmarks[currentCat].push({ date: new Date().toLocaleDateString(), text: input.value });
-        input.value = ''; save(); renderBookmarkUI();
+        input.value = ''; input.style.height = '42px'; save(); renderBookmarkUI();
     }
     function delBookmarkItem(idx) { if(confirm("刪除內容？")) { db.bookmarks[currentCat].splice(idx, 1); save(); renderBookmarkUI(); }}
 
@@ -661,6 +662,12 @@
                 <div class="search-result-meta">${item.meta}</div>
             </div>`;
         }).join('');
+    }
+
+
+    function autoResize(el) {
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 120) + 'px';
     }
 
     window.onload = () => { 
