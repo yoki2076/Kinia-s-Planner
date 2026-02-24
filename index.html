@@ -150,6 +150,40 @@
             .nav-bar { width: 35%; }
             .nav-item:nth-child(4) { display: none; }
         }
+
+        /* --- 搜尋 --- */
+        .search-overlay {
+            position: fixed; inset: 0; background: var(--bg-dark);
+            z-index: 500; display: flex; flex-direction: column;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .search-overlay.open { transform: translateY(0); }
+        .search-header {
+            display: flex; align-items: center; gap: 10px;
+            padding: 12px 15px; background: #000;
+            border-bottom: 1px solid var(--border); height: 60px; flex-shrink: 0;
+        }
+        .search-input {
+            flex: 1; background: #1e1e1e; border: 1px solid #444;
+            border-radius: 20px; padding: 10px 18px; color: white;
+            outline: none; font-size: 1rem; font-family: inherit;
+        }
+        .search-cancel { background: none; border: none; color: var(--accent-gray); font-size: 0.95rem; cursor: pointer; white-space: nowrap; padding: 0 4px; }
+        .search-results { flex: 1; overflow-y: auto; padding: 12px 15px; }
+        .search-empty { color: #555; text-align: center; margin-top: 60px; font-size: 0.95rem; }
+        .search-result-item {
+            background: #1e1e1e; border: 1px solid #fff;
+            border-radius: 12px; padding: 12px 15px; margin-bottom: 10px; cursor: pointer;
+            transition: background 0.15s;
+        }
+        .search-result-item:active { background: #2a2a2a; }
+        .search-result-source { font-size: 0.72rem; color: var(--accent-red); letter-spacing: 1px; margin-bottom: 5px; text-transform: uppercase; }
+        .search-result-text { color: #efefef; font-size: 0.95rem; line-height: 1.5; }
+        .search-result-text mark { background: #f5c518; color: #000; border-radius: 3px; padding: 0 2px; font-style: normal; }
+        .search-result-meta { color: #888; font-size: 0.75rem; margin-top: 5px; }
+        .icon-btn { background: none; border: none; color: var(--accent-gray); cursor: pointer; padding: 5px; display: flex; align-items: center; justify-content: center; border-radius: 6px; opacity: 0.8; }
+        .icon-btn:active { opacity: 1; background: #222; }
     </style>
 </head>
 <body>
@@ -158,8 +192,11 @@
     <div class="panel" id="weekPanel">
         <div class="header">
             <button class="btn-sm" onclick="changeWeek(-1)">◀ 上一週</button>
-            <div id="weekTitle" onclick="goToday()" style="font-weight:bold; cursor:pointer;">WEEK</div>
-            <button class="btn-sm" onclick="changeWeek(1)">下一週 ▶</button>
+            <div id="weekTitle" onclick="goToday()" style="font-weight:bold; cursor:pointer; flex:1; text-align:center;">WEEK</div>
+            <div style="display:flex; gap:6px; align-items:center;">
+                <button class="icon-btn" onclick="openSearch()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+                <button class="btn-sm" onclick="changeWeek(1)">下一週 ▶</button>
+            </div>
         </div>
         <div class="week-grid" id="weekGrid"></div>
     </div>
@@ -167,16 +204,22 @@
     <div class="panel" id="listPanel">
         <div class="header">
             <button class="btn-sm" onclick="changeMonth(-1)">◀</button>
-            <div id="monthTitle" style="font-weight:bold; cursor:pointer;" onclick="goToday()">MONTH</div>
-            <button class="btn-sm" onclick="changeMonth(1)">▶</button>
+            <div id="monthTitle" style="font-weight:bold; cursor:pointer; flex:1; text-align:center;" onclick="goToday()">MONTH</div>
+            <div style="display:flex; gap:6px; align-items:center;">
+                <button class="icon-btn" onclick="openSearch()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+                <button class="btn-sm" onclick="changeMonth(1)">▶</button>
+            </div>
         </div>
         <div class="list-view" id="calendarList"></div>
     </div>
 
     <div class="panel" id="bookmarkPanel">
         <div class="header">
-            <span style="font-weight:bold;">書籤收藏</span>
-            <button class="btn-sm" id="manageBtn" onclick="toggleBookmarkManage()">⚙️ 管理</button>
+            <span style="font-weight:bold; flex:1;">書籤收藏</span>
+            <div style="display:flex; gap:6px; align-items:center;">
+                <button class="icon-btn" onclick="openSearch()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+                <button class="icon-btn" id="manageBtn" onclick="toggleBookmarkManage()" title="管理分類"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+            </div>
         </div>
         <div id="bookmarkNormalUI" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
             <div class="bookmark-tabs" id="bookmarkTabs"></div>
@@ -201,10 +244,11 @@
                 <span id="activeDateDisplay" style="font-weight:bold;">日期</span> 
                 <span id="drawerArrow"> ▼</span>
             </div>
-            <div style="display:flex; gap:5px;">
+            <div style="display:flex; gap:6px; align-items:center;">
                 <button class="btn-sm" onclick="goToday()">今天</button>
-                <button class="btn-sm" onclick="exportData()">📤</button>
-                <button class="btn-sm" onclick="triggerImport()">📥</button>
+                <button class="icon-btn" onclick="openSearch()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+                <button class="icon-btn" onclick="exportData()" title="匯出"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><polyline points="8 12 12 8 16 12"/><line x1="12" y1="8" x2="12" y2="17"/></svg></button>
+                <button class="icon-btn" onclick="triggerImport()" title="匯入"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><polyline points="8 12 12 16 16 12"/><line x1="12" y1="16" x2="12" y2="7"/></svg></button>
                 <input type="file" id="importFile" style="display:none" onchange="importJSON(event)">
             </div>
         </div>
@@ -442,7 +486,7 @@
         isManaging = !isManaging;
         document.getElementById('bookmarkNormalUI').style.display = isManaging ? 'none' : 'flex';
         document.getElementById('bookmarkManageUI').style.display = isManaging ? 'flex' : 'none';
-        document.getElementById('manageBtn').innerText = isManaging ? "✅ 完成" : "⚙️ 管理";
+        document.getElementById('manageBtn').innerHTML = isManaging ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
         if(isManaging) renderManageUI(); else renderBookmarkUI();
     }
 
@@ -514,6 +558,111 @@
     }
     function delBookmarkItem(idx) { if(confirm("刪除內容？")) { db.bookmarks[currentCat].splice(idx, 1); save(); renderBookmarkUI(); }}
 
+
+    // ===== 搜尋功能 =====
+    let searchItems = [];
+
+    function openSearch() {
+        document.getElementById('searchOverlay').classList.add('open');
+        setTimeout(() => document.getElementById('searchInput').focus(), 300);
+    }
+
+    function closeSearch() {
+        document.getElementById('searchOverlay').classList.remove('open');
+        document.getElementById('searchInput').value = '';
+        document.getElementById('searchResults').innerHTML = '<div class="search-empty">輸入關鍵字開始搜尋</div>';
+    }
+
+    function highlight(text, kw) {
+        const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return text.replace(new RegExp(escaped, 'gi'), m => `<mark>${m}</mark>`);
+    }
+
+    function doSearch(kw) {
+        const results = document.getElementById('searchResults');
+        kw = kw.trim();
+        if (!kw) {
+            results.innerHTML = '<div class="search-empty">輸入關鍵字開始搜尋</div>';
+            return;
+        }
+        const kwLower = kw.toLowerCase();
+        searchItems = [];
+
+        // 時間軸
+        Object.entries(db.journals).forEach(([date, entries]) => {
+            (entries || []).forEach(j => {
+                if (j.text.toLowerCase().includes(kwLower)) {
+                    searchItems.push({
+                        type: '時間軸', date, text: j.text, meta: j.time + '　' + date,
+                        action: () => {
+                            closeSearch();
+                            const d = new Date(date);
+                            viewMonth = new Date(d); drawerMonth = new Date(d);
+                            selectDate(date, false);
+                            switchPanel(3);
+                            setTimeout(() => {
+                                const flow = document.getElementById('journalFlow');
+                                if (flow) flow.scrollTop = 0;
+                            }, 200);
+                        }
+                    });
+                }
+            });
+        });
+
+        // 行事曆
+        Object.entries(db.calendar).forEach(([date, text]) => {
+            if (text && text.toLowerCase().includes(kwLower)) {
+                searchItems.push({
+                    type: '行事曆', date, text, meta: date,
+                    action: () => {
+                        closeSearch();
+                        const d = new Date(date);
+                        viewMonth = new Date(d);
+                        selectDate(date, false);
+                        switchPanel(1);
+                        setTimeout(() => {
+                            const el = document.getElementById('list-' + date);
+                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }, 200);
+                    }
+                });
+            }
+        });
+
+        // 書籤
+        db.catOrder.forEach(cat => {
+            (db.bookmarks[cat] || []).forEach(b => {
+                if (b.text.toLowerCase().includes(kwLower)) {
+                    searchItems.push({
+                        type: '書籤・' + cat, date: b.date || '', text: b.text, meta: b.date || '',
+                        action: () => {
+                            closeSearch();
+                            currentCat = cat;
+                            switchPanel(2);
+                        }
+                    });
+                }
+            });
+        });
+
+        searchItems.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+        if (searchItems.length === 0) {
+            results.innerHTML = '<div class="search-empty">找不到相關結果</div>';
+            return;
+        }
+
+        results.innerHTML = searchItems.map((item, idx) => {
+            const safeText = item.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            return `<div class="search-result-item" onclick="searchItems[${idx}].action()">
+                <div class="search-result-source">${item.type}</div>
+                <div class="search-result-text">${highlight(safeText, kw)}</div>
+                <div class="search-result-meta">${item.meta}</div>
+            </div>`;
+        }).join('');
+    }
+
     window.onload = () => { 
         goToday(); 
         if(window.innerWidth >= 768) switchPanel(0); 
@@ -522,5 +671,17 @@
         setInterval(() => { if(document.activeElement !== document.getElementById('jnTimeInput')) updateInputTime(); }, 60000);
     };
 </script>
+
+<!-- 搜尋介面 -->
+<div class="search-overlay" id="searchOverlay">
+    <div class="search-header">
+        <input class="search-input" id="searchInput" placeholder="搜尋時間軸、行事曆、書籤..." oninput="doSearch(this.value)" autocomplete="off">
+        <button class="search-cancel" onclick="closeSearch()">取消</button>
+    </div>
+    <div class="search-results" id="searchResults">
+        <div class="search-empty">輸入關鍵字開始搜尋</div>
+    </div>
+</div>
+
 </body>
 </html>
