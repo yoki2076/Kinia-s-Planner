@@ -37,7 +37,7 @@
         .container { 
             display: flex; 
             height: calc(100vh - 60px); 
-            width: 500vw; 
+            width: 600vw; 
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
             position: fixed;
             top: 0;
@@ -146,10 +146,10 @@
             .container { width: 100vw; height: 100vh; transform: none !important; position: static; }
             .panel { width: 35%; height: calc(100vh - 60px); }
             #journalPanel { width: 65%; display: flex !important; }
-            #weekPanel, #listPanel, #bookmarkPanel, #shopPanel { display: none; }
-            #weekPanel.active-left, #listPanel.active-left, #bookmarkPanel.active-left, #shopPanel.active-left { display: flex; }
+            #weekPanel, #listPanel, #bookmarkPanel, #shopPanel, #astroPanel { display: none; }
+            #weekPanel.active-left, #listPanel.active-left, #bookmarkPanel.active-left, #shopPanel.active-left, #astroPanel.active-left { display: flex; }
             .nav-bar { width: 35%; }
-            .nav-item:nth-child(5) { display: none; }
+            .nav-item:nth-child(6) { display: none; }
         }
 
         /* --- 搜尋 --- */
@@ -248,9 +248,162 @@
         /* 新增按鈕 */
         .shop-add-card-btn { background:#1a1a1a; border:1px dashed #444; border-radius:16px; color:#666; font-size:1rem; padding:14px; cursor:pointer; text-align:center; width:100%; }
         .shop-add-card-btn:active { background:#252525; }
+        /* ══════════ 星象版面 ══════════ */
+        .astro-panel-scroll { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
+
+        .astro-section {
+            border-radius:16px;
+            background:linear-gradient(135deg,#0d0d2b 0%,#1a0a2e 50%,#0a1628 100%);
+            border:1px solid rgba(150,100,255,0.22);
+            position:relative; overflow:hidden; flex-shrink:0;
+        }
+        .astro-section::before {
+            content:''; position:absolute; inset:0; pointer-events:none;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='150'%3E%3Ccircle cx='20' cy='20' r='1' fill='white' opacity='0.35'/%3E%3Ccircle cx='80' cy='10' r='0.7' fill='white' opacity='0.5'/%3E%3Ccircle cx='160' cy='35' r='1.1' fill='white' opacity='0.28'/%3E%3Ccircle cx='220' cy='12' r='0.6' fill='white' opacity='0.45'/%3E%3Ccircle cx='50' cy='55' r='0.8' fill='white' opacity='0.3'/%3E%3Ccircle cx='130' cy='20' r='0.9' fill='white' opacity='0.4'/%3E%3Ccircle cx='200' cy='60' r='0.7' fill='white' opacity='0.25'/%3E%3Ccircle cx='110' cy='45' r='0.5' fill='white' opacity='0.55'/%3E%3C/svg%3E") repeat;
+        }
+        .astro-section-inner { position:relative; }
+
+        /* 收合標頭 */
+        .astro-collapse-header {
+            display:flex; justify-content:space-between; align-items:center;
+            padding:14px 16px; cursor:pointer; user-select:none;
+        }
+        .astro-collapse-header:active { opacity:0.8; }
+        .astro-collapse-title { font-size:0.72rem; color:rgba(200,170,255,0.8); letter-spacing:2.5px; text-transform:uppercase; }
+        .astro-collapse-right { display:flex; align-items:center; gap:8px; }
+        .astro-collapse-arrow { color:rgba(200,170,255,0.5); font-size:0.65rem; transition:transform 0.25s; }
+        .astro-collapse-arrow.open { transform:rotate(180deg); }
+        .astro-collapse-body { padding:0 16px 16px; }
+        .astro-collapse-body.hidden { display:none; }
+
+        .astro-section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+        .astro-section-title { font-size:0.72rem; color:rgba(200,170,255,0.75); letter-spacing:2.5px; text-transform:uppercase; }
+        .astro-icon-btn { background:rgba(255,255,255,0.07); border:1px solid rgba(200,150,255,0.2); border-radius:8px; color:rgba(200,170,255,0.7); font-size:0.75rem; padding:4px 10px; cursor:pointer; white-space:nowrap; }
+        .astro-icon-btn:active { background:rgba(255,255,255,0.13); }
+
+        /* 運勢 */
+        .astro-fortune-period { font-size:0.82rem; color:rgba(180,150,255,0.65); margin-bottom:6px; }
+        .astro-fortune-text { font-size:0.95rem; color:#e8d5ff; line-height:1.6; white-space:pre-wrap; word-break:break-word; }
+        .astro-fortune-empty { font-size:0.88rem; color:rgba(200,170,255,0.3); }
+        .astro-fortune-textarea {
+            width:100%; background:rgba(255,255,255,0.07); border:1px solid rgba(200,150,255,0.25);
+            border-radius:10px; padding:10px 12px; color:#e8d5ff; font-size:0.9rem;
+            outline:none; font-family:inherit; resize:none; line-height:1.5; box-sizing:border-box;
+        }
+        .astro-fortune-textarea::placeholder { color:rgba(200,170,255,0.28); }
+        .astro-fortune-input {
+            width:100%; background:rgba(255,255,255,0.07); border:1px solid rgba(200,150,255,0.25);
+            border-radius:10px; padding:9px 12px; color:#e8d5ff; font-size:0.88rem;
+            outline:none; font-family:inherit; box-sizing:border-box; margin-bottom:8px;
+        }
+        .astro-fortune-input::placeholder { color:rgba(200,170,255,0.28); }
+        .astro-save-btn { width:100%; background:linear-gradient(135deg,#6b3fa0,#3d1a6e); border:none; border-radius:10px; color:white; font-size:0.9rem; font-weight:bold; padding:10px; cursor:pointer; font-family:inherit; margin-top:8px; }
+        .astro-cancel-btn { width:100%; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1); border-radius:10px; color:rgba(255,255,255,0.45); font-size:0.88rem; padding:9px; cursor:pointer; font-family:inherit; margin-top:6px; }
+
+        /* 星盤 */
+        .astro-chart-tabs { display:flex; gap:6px; margin-bottom:12px; }
+        .astro-chart-tab { flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(200,150,255,0.15); border-radius:20px; color:rgba(200,170,255,0.55); font-size:0.8rem; padding:6px 0; cursor:pointer; text-align:center; }
+        .astro-chart-tab.active { background:rgba(130,70,220,0.35); border-color:rgba(180,130,255,0.5); color:#d4aaff; font-weight:bold; }
+        .astro-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+        .astro-table th { color:rgba(200,170,255,0.5); font-size:0.7rem; letter-spacing:1px; text-align:left; padding:4px 6px; border-bottom:1px solid rgba(200,150,255,0.1); font-weight:normal; }
+        .astro-table td { padding:8px 6px; border-bottom:1px solid rgba(255,255,255,0.05); color:#ddd; vertical-align:top; }
+        .astro-table td:first-child { color:#c9a0ff; font-weight:bold; white-space:nowrap; }
+        .astro-table tr:last-child td { border-bottom:none; }
+        .astro-note-cell { font-size:0.8rem; color:rgba(200,180,255,0.55); }
+        .astro-chart-edit-row { display:flex; gap:6px; margin-bottom:8px; align-items:center; }
+        .astro-chart-input { flex:1; background:rgba(255,255,255,0.07); border:1px solid rgba(200,150,255,0.2); border-radius:8px; padding:7px 8px; color:#e8d5ff; font-size:0.82rem; outline:none; font-family:inherit; min-width:0; }
+        .astro-chart-input::placeholder { color:rgba(200,170,255,0.25); }
+        .astro-add-row-btn { width:100%; background:none; border:1px dashed rgba(200,150,255,0.25); border-radius:10px; color:rgba(200,170,255,0.4); font-size:0.85rem; padding:8px; cursor:pointer; margin-top:4px; }
+        .astro-del-btn { background:none; border:none; color:rgba(255,100,100,0.35); cursor:pointer; font-size:0.9rem; padding:0 2px; flex-shrink:0; }
+
+        /* 多星盤：新增按鈕 */
+        .astro-add-chart-btn { width:100%; background:none; border:1px dashed rgba(200,150,255,0.2); border-radius:14px; color:rgba(200,170,255,0.45); font-size:0.9rem; padding:12px; cursor:pointer; text-align:center; }
+        .astro-add-chart-btn:active { background:rgba(255,255,255,0.04); }
+        /* 星盤名稱輸入 */
+        .astro-chart-name-input { width:100%; background:rgba(255,255,255,0.07); border:1px solid rgba(200,150,255,0.25); border-radius:10px; padding:9px 12px; color:#e8d5ff; font-size:0.95rem; font-weight:bold; outline:none; font-family:inherit; box-sizing:border-box; margin-bottom:10px; }
+        .astro-chart-name-input::placeholder { color:rgba(200,170,255,0.25); }
+
+        /* 星座 chips */
+        .astro-signs-row { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+        .astro-sign-chip { background:rgba(255,255,255,0.07); border:1px solid rgba(200,150,255,0.2); border-radius:20px; padding:4px 11px; font-size:0.75rem; color:rgba(220,200,255,0.7); cursor:pointer; white-space:nowrap; }
+        .astro-sign-chip.has-note { border-color:rgba(200,150,255,0.55); color:#d4aaff; background:rgba(150,80,255,0.18); }
+        .astro-sign-chip:active { opacity:0.7; }
+        .astro-signs-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .astro-sign-block label { font-size:0.7rem; color:rgba(200,170,255,0.55); display:block; margin-bottom:3px; }
+
+        /* ── Firebase 登入畫面 ── */
+        #authScreen {
+            position: fixed; inset: 0; background: var(--bg-dark);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            z-index: 9999; gap: 24px;
+        }
+        #authScreen.hidden { display: none; }
+        .auth-logo { font-size: 2rem; font-weight: bold; color: var(--accent-gray); letter-spacing: 2px; }
+        .auth-sub { color: var(--text-gray); font-size: 0.9rem; }
+        .auth-google-btn {
+            display: flex; align-items: center; gap: 12px;
+            background: white; color: #333; border: none;
+            border-radius: 12px; padding: 13px 24px;
+            font-size: 1rem; font-weight: bold; cursor: pointer;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+        }
+        .auth-google-btn:active { opacity: 0.85; }
+        .auth-status {
+            position: fixed; top: 0; left: 0; right: 0;
+            background: #0d0d0d; color: var(--text-gray);
+            font-size: 0.78rem; text-align: center;
+            padding: 5px 0; z-index: 1500;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            border-bottom: 1px solid #222;
+        }
+        .auth-status.hidden { display: none; }
+        .auth-user-dot { width: 7px; height: 7px; border-radius: 50%; background: #4caf50; flex-shrink: 0; }
+        .auth-signout-btn { background: none; border: none; color: #555; font-size: 0.75rem; cursor: pointer; text-decoration: underline; }
+        .sync-indicator {
+            position: fixed; bottom: 68px; right: 14px;
+            background: #1e1e1e; border: 1px solid #333;
+            border-radius: 20px; padding: 5px 12px;
+            font-size: 0.75rem; color: var(--text-gray);
+            z-index: 100; opacity: 0;
+            transition: opacity 0.4s;
+            pointer-events: none;
+        }
+        .sync-indicator.show { opacity: 1; }
     </style>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
+
+
+<!-- 登入畫面 -->
+<div id="authScreen">
+    <div class="auth-logo">Kinia's Planner</div>
+    <div class="auth-sub">登入以同步你的資料</div>
+    <button class="auth-google-btn" onclick="signInWithGoogle()">
+        <svg width="20" height="20" viewBox="0 0 48 48">
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.36-8.16 2.36-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+        使用 Google 帳號登入
+    </button>
+</div>
+
+<!-- 登入狀態列 -->
+<div class="auth-status hidden" id="authStatus">
+    <span class="auth-user-dot"></span>
+    <span id="authUserName"></span>
+    <button class="auth-signout-btn" onclick="signOut()">登出</button>
+</div>
+
+<!-- 同步提示 -->
+<div class="sync-indicator" id="syncIndicator">☁ 已同步</div>
 
 <div class="container" id="mainContainer">
     <div class="panel" id="weekPanel">
@@ -314,6 +467,14 @@
         <div class="shop-grid" id="shopGrid"></div>
     </div>
 
+    <!-- ══════════ 星象版面 ══════════ -->
+    <div class="panel" id="astroPanel">
+        <div class="header">
+            <span style="font-weight:bold;flex:1;">✦ 星象</span>
+        </div>
+        <div class="astro-panel-scroll" id="astroPanelScroll"></div>
+    </div>
+
     <div class="panel" id="journalPanel">
         <div class="header">
             <div onclick="toggleCalendar()" style="cursor:pointer; flex:1;">
@@ -350,15 +511,97 @@
     <button class="nav-item" onclick="switchPanel(1)">行事曆</button>
     <button class="nav-item" onclick="switchPanel(2)">書籤</button>
     <button class="nav-item" onclick="switchPanel(3)">購物</button>
-    <button class="nav-item" onclick="switchPanel(4)">時間軸</button>
+    <button class="nav-item" onclick="switchPanel(4)">星象</button>
+    <button class="nav-item" onclick="switchPanel(5)">時間軸</button>
 </div>
 
 <script>
+    // ══════════════════════════════════════════
+    // Firebase 設定
+    // ══════════════════════════════════════════
+    const firebaseConfig = {
+        apiKey:            "AIzaSyAncFCJPCWOLJ_-JupDwxebRF_uIcPnVLM",
+        authDomain:        "kinia-s-columns.firebaseapp.com",
+        projectId:         "kinia-s-columns",
+        storageBucket:     "kinia-s-columns.firebasestorage.app",
+        messagingSenderId: "290808271526",
+        appId:             "1:290808271526:web:66b856d0bc6eec25199a67",
+        measurementId:     "G-JQ6DGBKHN2"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth      = firebase.auth();
+    const firestore = firebase.firestore();
+    let currentUser    = null;
+    let firestoreDocRef = null;
+    let saveTimeout    = null;
+
+    // db：優先從 localStorage 讀（離線 cache）
     let db = JSON.parse(localStorage.getItem('mega_v14_final_fix')) || {
         calendar: {}, journals: {}, bookmarks: { "我的筆記": [] }, catOrder: ["我的筆記"], shop: []
     };
-    if(!db.shop) db.shop = [];
-    function save() { localStorage.setItem('mega_v14_final_fix', JSON.stringify(db)); }
+    if(!db.shop)  db.shop  = [];
+    if(!db.astro) db.astro = {};
+
+    // save()：寫 localStorage + 防抖 800ms 寫 Firestore
+    function save() {
+        localStorage.setItem('mega_v14_final_fix', JSON.stringify(db));
+        if(!firestoreDocRef) return;
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => {
+            firestoreDocRef.set({ data: JSON.stringify(db) })
+                .then(()  => showSync('☁ 已同步'))
+                .catch(() => showSync('⚠ 同步失敗'));
+        }, 800);
+    }
+
+    function showSync(msg) {
+        const el = document.getElementById('syncIndicator');
+        if(!el) return;
+        el.textContent = msg;
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 2500);
+    }
+
+    // Google 登入
+    function signInWithGoogle() {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithPopup(provider).catch(err => alert('登入失敗：' + err.message));
+    }
+    function signOut() {
+        if(!confirm('確定登出？')) return;
+        auth.signOut();
+    }
+
+    // Auth 狀態監聽：登入後拉雲端資料
+    auth.onAuthStateChanged(user => {
+        currentUser = user;
+        if(user) {
+            firestoreDocRef = firestore.collection('planners').doc(user.uid);
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('authStatus').classList.remove('hidden');
+            document.getElementById('authUserName').textContent = user.displayName || user.email;
+
+            firestoreDocRef.get().then(snap => {
+                if(snap.exists && snap.data().data) {
+                    const cloudDb = JSON.parse(snap.data().data);
+                    // 以 journals 總筆數判斷雲端是否較新
+                    const countEntries = d => Object.values(d.journals || {}).flat().length;
+                    if(countEntries(cloudDb) >= countEntries(db)) {
+                        db = cloudDb;
+                        if(!db.shop)  db.shop  = [];
+                        if(!db.astro) db.astro = {};
+                        localStorage.setItem('mega_v14_final_fix', JSON.stringify(db));
+                    }
+                }
+                initApp();
+            }).catch(() => initApp());
+        } else {
+            firestoreDocRef = null;
+            document.getElementById('authScreen').classList.remove('hidden');
+            document.getElementById('authStatus').classList.add('hidden');
+        }
+    });
     function getDS(d = new Date()) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 
     let activeDS = getDS(), viewMonth = new Date(), drawerMonth = new Date();
@@ -370,18 +613,19 @@
         if (window.innerWidth < 768) {
             document.getElementById('mainContainer').style.transform = `translateX(-${idx * 100}vw)`;
         } else {
-            ['weekPanel', 'listPanel', 'bookmarkPanel', 'shopPanel'].forEach((id, i) => {
+            ['weekPanel', 'listPanel', 'bookmarkPanel', 'shopPanel', 'astroPanel'].forEach((id, i) => {
                 const el = document.getElementById(id);
                 if(el) el.classList.toggle('active-left', i === idx);
             });
-            if(idx === 4) switchPanel(0);
+            if(idx === 5) switchPanel(0);
         }
         document.querySelectorAll('.nav-item').forEach((b, i) => b.classList.toggle('active', i === idx));
         if(idx === 0) renderWeek();
         if(idx === 1) renderList();
         if(idx === 2) renderBookmarkUI();
         if(idx === 3) { renderShopTabs(); renderShop(); }
-        if(idx === 4) renderJournals();
+        if(idx === 4) renderAstroPanel();
+        if(idx === 5) renderJournals();
     }
 
     function renderJournals() {
@@ -979,13 +1223,441 @@
         save(); renderShop();
     }
 
-    window.onload = () => { 
-        goToday(); 
+    // ══════════════════════════════════════
+    // ✦ 星象版面
+    // ══════════════════════════════════════
+    (function initAstroDB() {
+        if(!db.astro) db.astro = {};
+        const a = db.astro;
+        if(!a.current) a.current = {period:'', text:''};
+        if(!a.month)   a.month   = {period:'', text:'', signs:{}};
+        if(!a.week)    a.week    = {period:'', text:'', signs:{}};
+        if(!a.month.signs) a.month.signs = {};
+        if(!a.week.signs)  a.week.signs  = {};
+        if(!a.charts)  a.charts  = [{id:1, name:'我的星盤', positions:[], houses:[]}];
+        if(!a.collapsed) a.collapsed = {}; // { current, month, week, chart_1, ... }
+    })();
+
+    const ASTRO_SIGNS = ['♈牡羊','♉金牛','♊雙子','♋巨蟹','♌獅子','♍處女','♎天秤','♏天蠍','♐射手','♑摩羯','♒水瓶','♓雙魚'];
+    const CHART_CFG = {
+        positions: { cols:['星體','星座','度數','備註'], fields:['body','sign','degree','note'], ph:['太陽','牡羊座','15°',''] },
+        houses:    { cols:['宮位','星座','守護星','備註'], fields:['house','sign','ruler','note'], ph:['第一宮','牡羊座','火星',''] },
+    };
+
+    // 各區塊的編輯狀態
+    const astroEditState = { month: false, week: false };
+    const astroChartState = {}; // { [chartId]: { tab, editing } }
+
+    function aEsc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    function renderAstroPanel() {
+        const scroll = document.getElementById('astroPanelScroll');
+        if(!scroll) return;
+        scroll.innerHTML = '';
+
+        // 當前星象
+        scroll.appendChild(buildCurrentAstroSection());
+        // 月運勢
+        scroll.appendChild(buildAstroSection('month'));
+        // 週運勢
+        scroll.appendChild(buildAstroSection('week'));
+        // 星盤列表
+        db.astro.charts.forEach(chart => {
+            scroll.appendChild(buildAstroChartSection(chart));
+        });
+        // 新增星盤按鈕
+        const addBtn = document.createElement('button');
+        addBtn.className = 'astro-add-chart-btn';
+        addBtn.textContent = '＋ 新增星盤';
+        addBtn.onclick = addAstroChart;
+        scroll.appendChild(addBtn);
+    }
+
+    // ── 當前星象 ──
+    let astroCurEditingId = null; // null=不在編輯, id=編輯中的項目id
+
+    function buildCurrentAstroSection() {
+        const key = 'current';
+        const collapsed = !!db.astro.collapsed[key];
+        // 相容舊格式：若 current 是 {period,text} 就轉成陣列
+        if(!Array.isArray(db.astro.current)) {
+            const old = db.astro.current || {};
+            db.astro.current = (old.period||old.text)
+                ? [{id: Date.now(), title:'', period: old.period||'', text: old.text||''}]
+                : [];
+            save();
+        }
+        const items = db.astro.current;
+
+        const section = document.createElement('div');
+        section.className = 'astro-section';
+        const inner = document.createElement('div');
+        inner.className = 'astro-section-inner';
+
+        const header = document.createElement('div');
+        header.className = 'astro-collapse-header';
+        header.innerHTML = `
+            <span class="astro-collapse-title">☿ 當前星象</span>
+            <div class="astro-collapse-right">
+                ${!collapsed ? `<button class="astro-icon-btn" onclick="event.stopPropagation();addCurAstroItem()">＋ 新增</button>` : ''}
+                <span class="astro-collapse-arrow ${collapsed?'':'open'}">▲</span>
+            </div>`;
+        header.onclick = () => toggleAstroCollapse(key);
+
+        const body = document.createElement('div');
+        body.className = `astro-collapse-body${collapsed?' hidden':''}`;
+        body.id = 'astroCurBody';
+
+        if(items.length === 0) {
+            body.innerHTML = `<div class="astro-fortune-empty">尚未新增星象項目，點「＋ 新增」開始 ✨</div>`;
+        } else {
+            items.forEach(item => {
+                const itemEl = document.createElement('div');
+                itemEl.style.cssText = 'margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid rgba(200,150,255,0.1);';
+                itemEl.id = `curItem_${item.id}`;
+
+                if(astroCurEditingId === item.id) {
+                    itemEl.innerHTML = `
+                        <input class="astro-fortune-input" id="curTitle_${item.id}" placeholder="星象名稱（如：水星逆行）" value="${aEsc(item.title)}">
+                        <input class="astro-fortune-input" id="curPeriod_${item.id}" placeholder="期間（如：3/15–4/7）" value="${aEsc(item.period)}">
+                        <textarea class="astro-fortune-textarea" id="curText_${item.id}" rows="4" placeholder="詳細說明...">${aEsc(item.text)}</textarea>
+                        <div style="display:flex;gap:8px;margin-top:8px;">
+                            <button class="astro-cancel-btn" style="margin-top:0;" onclick="astroCurEditingId=null;renderAstroPanel()">取消</button>
+                            <button class="astro-save-btn" style="margin-top:0;" onclick="saveCurAstroItem(${item.id})">✦ 儲存</button>
+                        </div>`;
+                } else {
+                    itemEl.innerHTML = `
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+                            <div>
+                                ${item.title ? `<div style="font-size:0.9rem;font-weight:bold;color:#d4aaff;margin-bottom:2px;">${aEsc(item.title)}</div>` : ''}
+                                ${item.period ? `<div class="astro-fortune-period">📅 ${aEsc(item.period)}</div>` : ''}
+                            </div>
+                            <div style="display:flex;gap:6px;flex-shrink:0;margin-left:8px;">
+                                <button class="astro-icon-btn" onclick="astroCurEditingId=${item.id};renderAstroPanel()">編輯 ✎</button>
+                                <button class="astro-icon-btn" onclick="delCurAstroItem(${item.id})" style="color:rgba(255,100,100,0.65);">刪除</button>
+                            </div>
+                        </div>
+                        ${item.text ? `<div class="astro-fortune-text" style="font-size:0.9rem;">${aEsc(item.text)}</div>` : ''}`;
+                }
+                body.appendChild(itemEl);
+            });
+            // 最後一個不要底線
+            const last = body.lastElementChild;
+            if(last) last.style.borderBottom = 'none';
+        }
+
+        inner.appendChild(header);
+        inner.appendChild(body);
+        section.appendChild(inner);
+        return section;
+    }
+
+    function addCurAstroItem() {
+        if(!Array.isArray(db.astro.current)) db.astro.current = [];
+        const newId = Date.now();
+        db.astro.current.push({id: newId, title:'', period:'', text:''});
+        astroCurEditingId = newId;
+        db.astro.collapsed['current'] = false;
+        save(); renderAstroPanel();
+        setTimeout(()=>{ document.getElementById(`curItem_${newId}`)?.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 100);
+    }
+    function saveCurAstroItem(id) {
+        const item = db.astro.current.find(i=>i.id===id); if(!item) return;
+        item.title  = document.getElementById(`curTitle_${id}`)?.value.trim()||'';
+        item.period = document.getElementById(`curPeriod_${id}`)?.value.trim()||'';
+        item.text   = document.getElementById(`curText_${id}`)?.value.trim()||'';
+        save(); astroCurEditingId=null; renderAstroPanel();
+    }
+    function delCurAstroItem(id) {
+        if(!confirm('確定刪除此項目？')) return;
+        db.astro.current = db.astro.current.filter(i=>i.id!==id);
+        save(); renderAstroPanel();
+    }
+
+    // ── 收合區塊包裝 ──
+    function buildAstroSection(type) {
+        const isMonth = type === 'month';
+        const key = type;
+        const collapsed = !!db.astro.collapsed[key];
+        const titleLabel = isMonth ? '✦ 月運勢' : '✦ 週運勢';
+        const data = db.astro[type];
+        const hasContent = data.text?.trim() || Object.values(data.signs||{}).some(v=>v?.trim());
+
+        const section = document.createElement('div');
+        section.className = 'astro-section';
+        section.id = `astroSection_${type}`;
+
+        const inner = document.createElement('div');
+        inner.className = 'astro-section-inner';
+
+        // Header（點擊收合）
+        const header = document.createElement('div');
+        header.className = 'astro-collapse-header';
+        header.innerHTML = `
+            <span class="astro-collapse-title">${titleLabel}</span>
+            <div class="astro-collapse-right">
+                ${!collapsed ? `
+                    <button class="astro-icon-btn" onclick="event.stopPropagation();clearAstroFortune('${type}')" style="color:rgba(255,120,120,0.7);">清除</button>
+                    <button class="astro-icon-btn" onclick="event.stopPropagation();startAstroFortune('${type}')">編輯 ✎</button>
+                ` : ''}
+                <span class="astro-collapse-arrow ${collapsed?'':'open'}">▲</span>
+            </div>`;
+        header.onclick = () => toggleAstroCollapse(key);
+
+        // Body
+        const body = document.createElement('div');
+        body.className = `astro-collapse-body${collapsed?' hidden':''}`;
+        body.id = `astroBody_${type}`;
+
+        if (astroEditState[type]) {
+            body.innerHTML = buildFortureEditHtml(type, data);
+        } else {
+            body.innerHTML = buildFortuneViewHtml(type, data);
+            setTimeout(() => attachChipListeners(body, type), 0);
+        }
+
+        inner.appendChild(header);
+        inner.appendChild(body);
+        section.appendChild(inner);
+        return section;
+    }
+
+    function buildFortuneViewHtml(type, data) {
+        const isMonth = type === 'month';
+        const chipsHtml = ASTRO_SIGNS.map(s => {
+            const has = data.signs?.[s]?.trim();
+            return `<span class="astro-sign-chip ${has?'has-note':''}" data-type="${type}" data-sign="${s}">${s}</span>`;
+        }).join('');
+        return `
+            ${data.period ? `<div class="astro-fortune-period">📅 ${aEsc(data.period)}</div>` : ''}
+            ${data.text   ? `<div class="astro-fortune-text">${aEsc(data.text)}</div>` : `<div class="astro-fortune-empty">尚未填寫整體運勢 ✨</div>`}
+            <div class="astro-signs-row">${chipsHtml}</div>`;
+    }
+
+    function buildFortureEditHtml(type, data) {
+        const isMonth = type === 'month';
+        const signsHtml = ASTRO_SIGNS.map(s =>
+            `<div class="astro-sign-block">
+                <label>${s}</label>
+                <textarea class="astro-fortune-textarea astro-sign-ta" data-sign="${s}" rows="2" placeholder="運勢內容...">${aEsc(data.signs?.[s]||'')}</textarea>
+            </div>`
+        ).join('');
+        return `
+            <input class="astro-fortune-input" id="astro_${type}_period" placeholder="${isMonth?'月份（如：2026年3月）':'週期（如：3/3–3/9）'}" value="${aEsc(data.period)}">
+            <textarea class="astro-fortune-textarea" id="astro_${type}_text" rows="4" placeholder="整體${isMonth?'月':'週'}運勢概述...">${aEsc(data.text)}</textarea>
+            <div style="font-size:0.7rem;color:rgba(200,170,255,0.55);letter-spacing:1.5px;margin:12px 0 6px;">各星座運勢</div>
+            <div class="astro-signs-grid">${signsHtml}</div>
+            <button class="astro-save-btn" onclick="saveAstroFortune('${type}')">✦ 儲存</button>
+            <button class="astro-cancel-btn" onclick="cancelAstroFortune('${type}')">取消</button>`;
+    }
+
+    function attachChipListeners(body, type) {
+        body.querySelectorAll('.astro-sign-chip').forEach(chip => {
+            chip.addEventListener('click', e => {
+                e.stopPropagation();
+                const sign = chip.dataset.sign;
+                const t    = chip.dataset.type;
+                const text = db.astro[t]?.signs?.[sign];
+                if(!text?.trim()) return;
+                openAstroSignModal(sign, text);
+            });
+        });
+    }
+
+    function toggleAstroCollapse(key) {
+        db.astro.collapsed[key] = !db.astro.collapsed[key];
+        save(); renderAstroPanel();
+    }
+
+    function startAstroFortune(type) { astroEditState[type]=true; renderAstroPanel(); }
+    function cancelAstroFortune(type) { astroEditState[type]=false; renderAstroPanel(); }
+    function clearAstroFortune(type) {
+        if(!confirm(`確定清除所有${type==='month'?'月':'週'}運勢內容？`)) return;
+        db.astro[type] = {period:'', text:'', signs:{}};
+        save(); astroEditState[type]=false; renderAstroPanel();
+    }
+    function saveAstroFortune(type) {
+        db.astro[type].period = document.getElementById(`astro_${type}_period`)?.value.trim()||'';
+        db.astro[type].text   = document.getElementById(`astro_${type}_text`)?.value.trim()||'';
+        if(!db.astro[type].signs) db.astro[type].signs={};
+        document.getElementById(`astroBody_${type}`)?.querySelectorAll('.astro-sign-ta').forEach(el=>{
+            db.astro[type].signs[el.dataset.sign] = el.value.trim();
+        });
+        save(); astroEditState[type]=false; renderAstroPanel();
+    }
+
+    function openAstroSignModal(sign, text) {
+        let modal = document.getElementById('astroSignModal');
+        if(modal) modal.remove();
+        modal = document.createElement('div');
+        modal.id = 'astroSignModal';
+        modal.style.cssText = 'position:fixed;inset:0;z-index:800;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,0.55);';
+        modal.onclick = e => { if(e.target===modal) modal.remove(); };
+        modal.innerHTML = `<div style="background:linear-gradient(160deg,#0d0d2b,#1a0a2e);border:1px solid rgba(150,100,255,0.3);border-radius:20px 20px 0 0;padding:24px 20px 36px;width:100%;max-width:500px;max-height:70vh;overflow-y:auto;">
+            <div style="font-size:1.05rem;font-weight:bold;color:#d4aaff;margin-bottom:14px;">${sign}</div>
+            <div style="font-size:0.95rem;color:#e8d5ff;line-height:1.7;white-space:pre-wrap;">${aEsc(text)}</div>
+            <button onclick="document.getElementById('astroSignModal').remove()" style="margin-top:20px;width:100%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:rgba(255,255,255,0.5);padding:10px;cursor:pointer;font-family:inherit;">關閉</button>
+        </div>`;
+        document.body.appendChild(modal);
+    }
+
+    // ── 多星盤 ──
+    function buildAstroChartSection(chart) {
+        const key = `chart_${chart.id}`;
+        const collapsed = !!db.astro.collapsed[key];
+        if(!astroChartState[chart.id]) astroChartState[chart.id] = { tab:'positions', editing:false };
+        const state = astroChartState[chart.id];
+
+        const section = document.createElement('div');
+        section.className = 'astro-section';
+
+        const inner = document.createElement('div');
+        inner.className = 'astro-section-inner';
+
+        const header = document.createElement('div');
+        header.className = 'astro-collapse-header';
+        header.innerHTML = `
+            <span class="astro-collapse-title">✦ ${aEsc(chart.name)}</span>
+            <div class="astro-collapse-right">
+                ${!collapsed ? `
+                    <button class="astro-icon-btn" onclick="event.stopPropagation();delAstroChart(${chart.id})" style="color:rgba(255,100,100,0.65);">刪除</button>
+                    <button class="astro-icon-btn" onclick="event.stopPropagation();startChartEdit(${chart.id})">編輯 ✎</button>
+                ` : ''}
+                <span class="astro-collapse-arrow ${collapsed?'':'open'}">▲</span>
+            </div>`;
+        header.onclick = () => toggleAstroCollapse(key);
+
+        const body = document.createElement('div');
+        body.className = `astro-collapse-body${collapsed?' hidden':''}`;
+        body.id = `astroChartBody_${chart.id}`;
+        body.innerHTML = buildChartBodyHtml(chart, state);
+
+        inner.appendChild(header);
+        inner.appendChild(body);
+        section.appendChild(inner);
+        return section;
+    }
+
+    function buildChartBodyHtml(chart, state) {
+        const cfg = CHART_CFG[state.tab];
+        const rows = chart[state.tab] || [];
+        const tabsHtml = ['positions','houses'].map(t=>
+            `<button class="astro-chart-tab ${state.tab===t?'active':''}" onclick="setChartTab(${chart.id},'${t}')">${t==='positions'?'星位':'宮位'}</button>`
+        ).join('');
+
+        // 星盤名稱 & tab
+        const nameField = state.editing
+            ? `<input class="astro-chart-name-input" id="chartName_${chart.id}" value="${aEsc(chart.name)}" placeholder="星盤名稱">`
+            : '';
+
+        if(!state.editing) {
+            const tableRows = rows.length===0
+                ? `<tr><td colspan="4" style="text-align:center;color:rgba(200,170,255,0.3);padding:16px 0;">尚未填寫，點「編輯」新增</td></tr>`
+                : rows.map(r=>`<tr>
+                    <td>${aEsc(r[cfg.fields[0]]||'')}</td>
+                    <td>${aEsc(r[cfg.fields[1]]||'')}</td>
+                    <td>${aEsc(r[cfg.fields[2]]||'')}</td>
+                    <td class="astro-note-cell">${aEsc(r[cfg.fields[3]]||'')}</td>
+                </tr>`).join('');
+            return `
+                <div class="astro-chart-tabs">${tabsHtml}</div>
+                <table class="astro-table">
+                    <thead><tr>${cfg.cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead>
+                    <tbody>${tableRows}</tbody>
+                </table>`;
+        } else {
+            const editRows = rows.map((r,i)=>
+                `<div class="astro-chart-edit-row">
+                    ${cfg.fields.map((f,fi)=>`<input class="astro-chart-input" data-row="${i}" data-field="${f}" placeholder="${cfg.ph[fi]}" value="${aEsc(r[f]||'')}">` ).join('')}
+                    <button class="astro-del-btn" onclick="delChartRow(${chart.id},${i})">✕</button>
+                </div>`
+            ).join('');
+            return `
+                <div id="chartEditRows_${chart.id}">
+                    ${nameField}
+                    <div class="astro-chart-tabs">${tabsHtml}</div>
+                    ${editRows}
+                </div>
+                <button class="astro-add-row-btn" onclick="addChartRow(${chart.id})">＋ 新增一列</button>
+                <button class="astro-save-btn" onclick="saveChartEdit(${chart.id})">✦ 儲存</button>
+                <button class="astro-cancel-btn" onclick="cancelChartEdit(${chart.id})">取消</button>`;
+        }
+    }
+
+    function setChartTab(id, tab) {
+        if(!astroChartState[id]) astroChartState[id]={tab,editing:false};
+        astroChartState[id].tab = tab;
+        astroChartState[id].editing = false;
+        renderAstroPanel();
+    }
+    function startChartEdit(id) { astroChartState[id].editing=true; renderAstroPanel(); }
+    function cancelChartEdit(id) { astroChartState[id].editing=false; renderAstroPanel(); }
+
+    function syncChartFromDOM(chart) {
+        const state = astroChartState[chart.id];
+        const container = document.getElementById(`chartEditRows_${chart.id}`);
+        if(!container) return;
+        const nameEl = document.getElementById(`chartName_${chart.id}`);
+        if(nameEl) chart.name = nameEl.value.trim() || chart.name;
+        const inputs = container.querySelectorAll('.astro-chart-input');
+        const rows = chart[state.tab];
+        inputs.forEach(inp => {
+            const i = parseInt(inp.dataset.row);
+            const f = inp.dataset.field;
+            if(rows[i]) rows[i][f] = inp.value;
+        });
+    }
+
+    function addChartRow(id) {
+        const chart = db.astro.charts.find(c=>c.id===id); if(!chart) return;
+        syncChartFromDOM(chart);
+        const tab = astroChartState[id].tab;
+        const blank={}; CHART_CFG[tab].fields.forEach(f=>blank[f]='');
+        if(!chart[tab]) chart[tab]=[];
+        chart[tab].push(blank);
+        save(); renderAstroPanel();
+    }
+    function delChartRow(id, i) {
+        const chart = db.astro.charts.find(c=>c.id===id); if(!chart) return;
+        syncChartFromDOM(chart);
+        chart[astroChartState[id].tab].splice(i,1);
+        save(); renderAstroPanel();
+    }
+    function saveChartEdit(id) {
+        const chart = db.astro.charts.find(c=>c.id===id); if(!chart) return;
+        syncChartFromDOM(chart);
+        save(); astroChartState[id].editing=false; renderAstroPanel();
+    }
+    function addAstroChart() {
+        const newId = Date.now();
+        db.astro.charts.push({id:newId, name:'新星盤', positions:[], houses:[]});
+        astroChartState[newId] = {tab:'positions', editing:true};
+        save(); renderAstroPanel();
+        // 捲到底部
+        setTimeout(()=>{ const s=document.getElementById('astroPanelScroll'); if(s) s.scrollTop=s.scrollHeight; },100);
+    }
+    function delAstroChart(id) {
+        if(db.astro.charts.length<=1){ alert('至少保留一個星盤'); return; }
+        if(!confirm('確定刪除此星盤？')) return;
+        db.astro.charts = db.astro.charts.filter(c=>c.id!==id);
+        delete astroChartState[id];
+        save(); renderAstroPanel();
+    }
+
+    function initApp() {
+        currentCat = db.catOrder[0] || "我的筆記";
+        goToday();
         renderShopTabs(); renderShop();
-        if(window.innerWidth >= 768) switchPanel(0); 
+        if(window.innerWidth >= 768) switchPanel(0);
         else switchPanel(0);
         updateInputTime();
-        setInterval(() => { if(document.activeElement !== document.getElementById('jnTimeInput')) updateInputTime(); }, 60000);
+        setInterval(() => {
+            if(document.activeElement !== document.getElementById('jnTimeInput')) updateInputTime();
+        }, 60000);
+    }
+
+    window.onload = () => {
+        // Auth 監聽已在宣告時啟動，登入後自動呼叫 initApp()
     };
 </script>
 
