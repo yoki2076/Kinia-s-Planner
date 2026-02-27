@@ -81,6 +81,11 @@
         }
         .text-bubble div[contenteditable="true"] { flex: 1; outline: none; word-break: break-word; white-space: pre-wrap; cursor: text; line-height: 1.4; }
         .jn-del-btn { background: none; border: none; color: #888; font-size: 1.1rem; cursor: pointer; padding: 0 5px; display: flex; align-items: center; }
+        .jn-sw-btn { background: none; border: none; color: #888; font-size: 0.78rem; cursor: pointer; padding: 2px 5px; display: flex; flex-direction: column; align-items: center; gap: 1px; line-height: 1; flex-shrink: 0; border-radius: 6px; }
+        .jn-sw-btn:active { background: #333; }
+        .jn-sw-btn.running { color: #f5c518; }
+        .jn-sw-display { font-size: 0.72rem; font-family: monospace; color: #666; min-width: 38px; text-align: center; }
+        .jn-sw-display.running { color: #f5c518; }
 
         /* 輸入列佈局 */
         .input-bar { 
@@ -776,21 +781,79 @@
     }
 
     function renderJournals() {
-        const flow = document.getElementById('journalFlow'); if(!flow) return; 
+        const flow = document.getElementById('journalFlow'); if(!flow) return;
         const items = db.journals[activeDS] || [];
         flow.innerHTML = '';
         items.sort((a,b) => a.time.localeCompare(b.time)).forEach((j, i) => {
+            const swState = swStates[activeDS + '_' + i];
+            const isRunning = swState && swState.running;
+            const elapsed = swState ? swState.elapsed : 0;
             flow.innerHTML += `
                 <div class="bubble-item">
                     <input type="time" class="time-input" value="${j.time}" onchange="updateJTime(${i}, this.value)">
                     <div class="text-bubble">
                         <div contenteditable="true" onblur="updateJText(${i}, this.innerText)">${j.text}</div>
+                        <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;">
+                            <button class="jn-sw-btn ${isRunning?'running':''}" onclick="toggleStopwatch(${i})" title="碼錶">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><polyline points="12 9 12 13 14.5 15.5"/><path d="M9 2h6M12 2v3"/></svg>
+                            </button>
+                            <span class="jn-sw-display ${isRunning?'running':''}" id="swDisp_${i}">${fmtSw(elapsed)}</span>
+                        </div>
                         <button class="jn-del-btn" onclick="delJournal(${i})">✕</button>
                     </div>
                 </div>`;
         });
         flow.scrollTop = flow.scrollHeight;
         updateInputTime();
+    }
+
+
+    // ── 碼錶 ──────────────────────────────────────────────────
+    // swStates: { 'YYYY-MM-DD_i': { running, startAt, elapsed, interval } }
+    const swStates = {};
+
+    function fmtSw(ms) {
+        if(!ms) return '00:00';
+        const s = Math.floor(ms / 1000);
+        const m = Math.floor(s / 60);
+        const h = Math.floor(m / 60);
+        if(h > 0) return `${String(h).padStart(2,'0')}:${String(m%60).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+        return `${String(m).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+    }
+
+    function toggleStopwatch(idx) {
+        const key = activeDS + '_' + idx;
+        if(!swStates[key]) swStates[key] = { running: false, startAt: 0, elapsed: 0, interval: null };
+        const sw = swStates[key];
+
+        if(!sw.running) {
+            // 開始計時
+            sw.running = true;
+            sw.startAt = Date.now() - sw.elapsed;
+            sw.interval = setInterval(() => {
+                sw.elapsed = Date.now() - sw.startAt;
+                const disp = document.getElementById(`swDisp_${idx}`);
+                if(disp) disp.textContent = fmtSw(sw.elapsed);
+            }, 500);
+            // 更新按鈕樣式
+            const btn = document.querySelectorAll('.jn-sw-btn')[idx];
+            if(btn) { btn.classList.add('running'); }
+            const disp = document.getElementById(`swDisp_${idx}`);
+            if(disp) disp.classList.add('running');
+        } else {
+            // 停止 → 把時間寫入文字
+            clearInterval(sw.interval);
+            sw.running = false;
+            const timeStr = fmtSw(sw.elapsed);
+            sw.elapsed = 0;
+            // 附加到該筆 journal text
+            const items = db.journals[activeDS];
+            if(items && items[idx]) {
+                items[idx].text = (items[idx].text ? items[idx].text + '\n' : '') + '⏱ ' + timeStr;
+                save();
+            }
+            renderJournals();
+        }
     }
 
     function updateInputTime() {
