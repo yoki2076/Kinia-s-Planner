@@ -1699,20 +1699,17 @@
                         </div>
                         <textarea class="astro-fortune-textarea" id="curText_${item.id}" rows="4" placeholder="詳細說明...">${aEsc(item.text)}</textarea>
                         <div class="astro-btn-row">
+                            <button class="astro-icon-btn" style="padding:9px 12px;color:rgba(255,100,100,0.7);border:1px solid rgba(255,100,100,0.25);" onclick="delCurAstroItem(${item.id})">刪除</button>
                             <button class="astro-cancel-btn" onclick="astroCurEditingId=null;renderAstroPanel()">取消</button>
                             <button class="astro-save-btn" onclick="saveCurAstroItem(${item.id})">✦ 儲存</button>
                         </div>`;
                 } else {
+                    itemEl.style.cursor = 'default';
                     itemEl.innerHTML = `
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
-                            <div style="font-size:0.9rem;font-weight:bold;color:#d4aaff;">${item.title ? aEsc(item.title) : '（未命名）'}</div>
-                            <div style="display:flex;gap:4px;flex-shrink:0;margin-left:8px;">
-                                <button class="astro-icon-btn" style="font-size:0.72rem;padding:3px 8px;" onclick="astroCurEditingId=${item.id};renderAstroPanel()">編輯 ✎</button>
-                                <button class="astro-icon-btn" style="font-size:0.72rem;padding:3px 8px;color:rgba(255,100,100,0.65);" onclick="delCurAstroItem(${item.id})">刪除</button>
-                            </div>
-                        </div>
+                        <div style="font-size:0.9rem;font-weight:bold;color:#d4aaff;margin-bottom:3px;">${item.title ? aEsc(item.title) : '（未命名）'}</div>
                         ${item.period ? `<div class="astro-fortune-period" style="margin-bottom:6px;">📅 ${aEsc(item.period)}</div>` : ''}
                         ${item.text ? `<div class="astro-fortune-text" style="font-size:0.9rem;">${aEsc(item.text)}</div>` : ''}`;
+                    itemEl.ondblclick = () => { astroCurEditingId = item.id; renderAstroPanel(); };
                 }
                 body.appendChild(itemEl);
             });
