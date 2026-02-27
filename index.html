@@ -106,7 +106,16 @@
 
         /* 書籤樣式 */
         .bookmark-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 12px; background: #1a1a1a; border-bottom: 1px solid #333; scrollbar-width: none; }
-        .bookmark-item { background: var(--bm-card); border-radius: 10px; padding: 14px; margin-bottom: 12px; border: 1px solid #333; border-left: 4px solid var(--accent-gray); position: relative; }
+        .bookmark-item { background: var(--bm-card); border-radius: 10px; padding: 14px; margin-bottom: 12px; border: 1px solid #333; border-left: 4px solid var(--accent-gray); position: relative; transition: opacity 0.15s; }
+        .bookmark-item.dragging { opacity: 0.35; }
+        .bookmark-item.drag-over { border-top: 2px solid var(--accent-gray); margin-top: -2px; }
+        .bookmark-item-edit { background: var(--bm-card); border-radius: 10px; padding: 14px; margin-bottom: 12px; border: 1px solid #555; display: flex; flex-direction: column; gap: 10px; }
+        .bm-edit-textarea { background: #2c2c2e; border: none; border-radius: 10px; padding: 10px 13px; color: white; font-size: 1rem; outline: none; font-family: inherit; resize: none; overflow: hidden; min-height: 60px; max-height: 200px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+        .bm-btn-row { display: flex; gap: 8px; }
+        .bm-save-btn { flex: 1; background: var(--accent-gray); color: #000; border: none; border-radius: 10px; padding: 9px; font-size: 0.9rem; font-weight: bold; cursor: pointer; }
+        .bm-cancel-btn { flex: 1; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: rgba(255,255,255,0.45); font-size: 0.9rem; padding: 9px; cursor: pointer; }
+        .bm-drag-handle { color: #555; cursor: grab; font-size: 1rem; flex-shrink: 0; touch-action: none; user-select: none; position: absolute; left: -4px; top: 50%; transform: translateY(-50%); padding: 0 4px; display: none; }
+        .bookmark-item:hover .bm-drag-handle { display: block; }
         .bm-text { font-size: 1rem; color: #eee; line-height: 1.6; margin-bottom: 8px; word-break: break-word; white-space: pre-wrap; }
         .bm-date { font-size: 0.75rem; color: #666; text-align: right; display: block; }
         .bm-del-btn { position: absolute; top: 8px; right: 8px; background: none; border: none; color: #555; cursor: pointer; }
@@ -321,11 +330,11 @@
         .astro-chart-tab { flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(200,150,255,0.15); border-radius:20px; color:rgba(200,170,255,0.55); font-size:0.8rem; padding:6px 0; cursor:pointer; text-align:center; }
         .astro-chart-tab.active { background:rgba(130,70,220,0.35); border-color:rgba(180,130,255,0.5); color:#d4aaff; font-weight:bold; }
         .astro-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
-        .astro-table th { color:rgba(200,170,255,0.5); font-size:0.7rem; letter-spacing:1px; text-align:left; padding:4px 6px; border-bottom:1px solid rgba(200,150,255,0.1); font-weight:normal; }
-        .astro-table td { padding:8px 6px; border-bottom:1px solid rgba(255,255,255,0.05); color:#ddd; vertical-align:top; }
+        .astro-table th { color:rgba(200,170,255,0.5); font-size:0.7rem; letter-spacing:1px; text-align:center; padding:4px 6px; border-bottom:1px solid rgba(200,150,255,0.1); font-weight:normal; }
+        .astro-table td { padding:8px 6px; border-bottom:1px solid rgba(255,255,255,0.05); color:#ddd; vertical-align:middle; text-align:center; }
         .astro-table td:first-child { color:#c9a0ff; font-weight:bold; white-space:nowrap; }
         .astro-table tr:last-child td { border-bottom:none; }
-        .astro-note-cell { font-size:0.8rem; color:rgba(200,180,255,0.55); }
+        .astro-note-cell { font-size:0.8rem; color:rgba(200,180,255,0.55); text-align:center; }
         .astro-chart-edit-row { display:flex; gap:6px; margin-bottom:8px; align-items:center; }
         .astro-chart-input { flex:1; background:rgba(255,255,255,0.07); border:1px solid rgba(200,150,255,0.2); border-radius:8px; padding:7px 8px; color:#e8d5ff; font-size:0.82rem; outline:none; font-family:inherit; min-width:0; }
         .astro-chart-input::placeholder { color:rgba(200,170,255,0.25); }
@@ -892,34 +901,159 @@
         return frag;
     }
 
+    // 書籤編輯狀態：{ idx: true/false }
+    let bmEditState = {};
+
     function renderBookmarkUI() {
         if(isManaging) { renderManageUI(); return; }
         const tabs = document.getElementById('bookmarkTabs'); if(!tabs) return;
         tabs.innerHTML = '';
         db.catOrder.forEach(cat => {
-            tabs.innerHTML += `<button class="btn-sm" style="white-space:nowrap; border-radius:20px; ${currentCat===cat?'background:var(--accent-gray);color:black':''}" onclick="currentCat='${cat}';renderBookmarkUI()">${cat}</button>`;
+            tabs.innerHTML += `<button class="btn-sm" style="white-space:nowrap; border-radius:20px; ${currentCat===cat?'background:var(--accent-gray);color:black':''}" onclick="currentCat='${cat}';bmEditState={};renderBookmarkUI()">${cat}</button>`;
         });
         const content = document.getElementById('bookmarkContent'); if(!content) return;
         content.innerHTML = '';
         (db.bookmarks[currentCat] || []).forEach((b, i) => {
             const item = document.createElement('div');
-            item.className = 'bookmark-item';
-            const delBtn = document.createElement('button');
-            delBtn.className = 'bm-del-btn';
-            delBtn.textContent = '✕';
-            delBtn.onclick = () => delBookmarkItem(i);
-            const textDiv = document.createElement('div');
-            textDiv.className = 'bm-text';
-            textDiv.appendChild(linkify(b.text));
-            const dateSpan = document.createElement('span');
-            dateSpan.className = 'bm-date';
-            dateSpan.textContent = b.date || '';
-            item.appendChild(delBtn);
-            item.appendChild(textDiv);
-            item.appendChild(dateSpan);
+            item.dataset.bmIdx = i;
+
+            if(bmEditState[i]) {
+                // ── 編輯模式 ──
+                item.className = 'bookmark-item-edit';
+                const ta = document.createElement('textarea');
+                ta.className = 'bm-edit-textarea';
+                ta.value = b.text || '';
+                ta.id = `bmEdit_${i}`;
+                ta.oninput = () => autoResize(ta);
+                const btnRow = document.createElement('div');
+                btnRow.className = 'bm-btn-row';
+                const cancelBtn = document.createElement('button');
+                cancelBtn.className = 'bm-cancel-btn';
+                cancelBtn.textContent = '取消';
+                cancelBtn.onclick = () => {
+                    if(b._isNew) {
+                        db.bookmarks[currentCat].splice(i, 1);
+                        save();
+                    }
+                    delete bmEditState[i];
+                    renderBookmarkUI();
+                };
+                const saveBtn = document.createElement('button');
+                saveBtn.className = 'bm-save-btn';
+                saveBtn.textContent = '儲存';
+                saveBtn.onclick = () => {
+                    const val = document.getElementById(`bmEdit_${i}`)?.value.trim() || '';
+                    if(!val) return;
+                    db.bookmarks[currentCat][i].text = val;
+                    delete db.bookmarks[currentCat][i]._isNew;
+                    delete bmEditState[i];
+                    save(); renderBookmarkUI();
+                };
+                btnRow.appendChild(cancelBtn);
+                btnRow.appendChild(saveBtn);
+                item.appendChild(ta);
+                item.appendChild(btnRow);
+                setTimeout(() => { autoResize(ta); ta.focus(); }, 0);
+            } else {
+                // ── 唯讀模式 ──
+                item.className = 'bookmark-item';
+                item.setAttribute('draggable', 'true');
+
+                const handle = document.createElement('span');
+                handle.className = 'bm-drag-handle';
+                handle.textContent = '⠿';
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'bm-del-btn';
+                delBtn.textContent = '✕';
+                delBtn.onclick = () => delBookmarkItem(i);
+
+                const textDiv = document.createElement('div');
+                textDiv.className = 'bm-text';
+                textDiv.style.cursor = 'pointer';
+                textDiv.appendChild(linkify(b.text));
+                textDiv.ondblclick = () => { bmEditState[i] = true; renderBookmarkUI(); };
+
+                const dateSpan = document.createElement('span');
+                dateSpan.className = 'bm-date';
+                dateSpan.textContent = b.date || '';
+
+                item.appendChild(handle);
+                item.appendChild(delBtn);
+                item.appendChild(textDiv);
+                item.appendChild(dateSpan);
+            }
             content.appendChild(item);
         });
         content.scrollTop = content.scrollHeight;
+        attachBmDragHandlers(content);
+    }
+
+    function attachBmDragHandlers(container) {
+        let dragSrcIdx = null;
+        container.querySelectorAll('.bookmark-item[draggable]').forEach(item => {
+            item.addEventListener('dragstart', e => {
+                dragSrcIdx = parseInt(item.dataset.bmIdx);
+                item.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            item.addEventListener('dragend', () => {
+                item.classList.remove('dragging');
+                container.querySelectorAll('.bookmark-item.drag-over').forEach(r => r.classList.remove('drag-over'));
+            });
+            item.addEventListener('dragover', e => {
+                e.preventDefault();
+                container.querySelectorAll('.bookmark-item.drag-over').forEach(r => r.classList.remove('drag-over'));
+                const destIdx = parseInt(item.dataset.bmIdx);
+                if(destIdx !== dragSrcIdx) item.classList.add('drag-over');
+            });
+            item.addEventListener('drop', e => {
+                e.preventDefault();
+                const destIdx = parseInt(item.dataset.bmIdx);
+                if(dragSrcIdx === null || dragSrcIdx === destIdx) return;
+                const items = db.bookmarks[currentCat];
+                const moved = items.splice(dragSrcIdx, 1)[0];
+                items.splice(destIdx, 0, moved);
+                dragSrcIdx = null;
+                save(); renderBookmarkUI();
+            });
+
+            // Touch
+            const handle = item.querySelector('.bm-drag-handle');
+            if(!handle) return;
+            let touchSrc = null, cloneEl = null;
+            handle.addEventListener('touchstart', e => {
+                touchSrc = parseInt(item.dataset.bmIdx);
+                item.classList.add('dragging');
+                cloneEl = item.cloneNode(true);
+                cloneEl.style.cssText = 'position:fixed;z-index:9000;opacity:0.85;pointer-events:none;width:' + item.offsetWidth + 'px;background:var(--bm-card);border-radius:10px;padding:14px;';
+                document.body.appendChild(cloneEl);
+            }, { passive: true });
+            handle.addEventListener('touchmove', e => {
+                e.preventDefault();
+                const t = e.touches[0];
+                if(cloneEl) { cloneEl.style.left=(t.clientX-30)+'px'; cloneEl.style.top=(t.clientY-20)+'px'; }
+                container.querySelectorAll('.bookmark-item.drag-over').forEach(r => r.classList.remove('drag-over'));
+                const el = document.elementFromPoint(t.clientX, t.clientY);
+                const over = el?.closest('.bookmark-item[draggable]');
+                if(over && parseInt(over.dataset.bmIdx) !== touchSrc) over.classList.add('drag-over');
+            }, { passive: false });
+            handle.addEventListener('touchend', e => {
+                if(cloneEl) { cloneEl.remove(); cloneEl = null; }
+                item.classList.remove('dragging');
+                container.querySelectorAll('.bookmark-item.drag-over').forEach(r => r.classList.remove('drag-over'));
+                const t = e.changedTouches[0];
+                const el = document.elementFromPoint(t.clientX, t.clientY);
+                const destItem = el?.closest('.bookmark-item[draggable]');
+                if(!destItem) return;
+                const destIdx = parseInt(destItem.dataset.bmIdx);
+                if(touchSrc === null || touchSrc === destIdx) return;
+                const items = db.bookmarks[currentCat];
+                const moved = items.splice(touchSrc, 1)[0];
+                items.splice(destIdx, 0, moved);
+                save(); renderBookmarkUI();
+            });
+        });
     }
 
     function toggleBookmarkManage() {
@@ -991,10 +1125,22 @@
     }
 
     function addBookmarkContent() {
-        const input = document.getElementById('bmInput'); if(!input.value.trim() || !currentCat) return;
+        const input = document.getElementById('bmInput');
+        const text = input?.value.trim() || '';
+        if(!currentCat) return;
         if(!db.bookmarks[currentCat]) db.bookmarks[currentCat] = [];
-        db.bookmarks[currentCat].push({ date: new Date().toLocaleDateString(), text: input.value });
-        input.value = ''; input.style.height = '42px'; save(); renderBookmarkUI();
+        // 若輸入欄有內容直接存，否則新增空草稿進編輯模式
+        const newItem = { date: new Date().toLocaleDateString(), text, _isNew: true };
+        db.bookmarks[currentCat].push(newItem);
+        const newIdx = db.bookmarks[currentCat].length - 1;
+        if(input) { input.value = ''; input.style.height = '42px'; }
+        if(text) {
+            delete newItem._isNew;
+            save(); renderBookmarkUI();
+        } else {
+            bmEditState[newIdx] = true;
+            renderBookmarkUI();
+        }
     }
     function delBookmarkItem(idx) { if(confirm("刪除內容？")) { db.bookmarks[currentCat].splice(idx, 1); save(); renderBookmarkUI(); }}
 
@@ -1468,7 +1614,7 @@
     const ASTRO_SIGNS = ['♈牡羊','♉金牛','♊雙子','♋巨蟹','♌獅子','♍處女','♎天秤','♏天蠍','♐射手','♑摩羯','♒水瓶','♓雙魚'];
     const CHART_CFG = {
         positions: { cols:['星體','星座','度數','備註'], fields:['body','sign','degree','note'], ph:['太陽','牡羊座','15°',''] },
-        houses:    { cols:['宮位','星座','守護星','備註'], fields:['house','sign','ruler','note'], ph:['第一宮','牡羊座','火星',''] },
+        houses:    { cols:['宮位','星座','宮位守護星','飛入'], fields:['house','sign','ruler','flyinto'], ph:['第一宮','牡羊座','火星',''] },
     };
 
     // 各區塊的編輯狀態
