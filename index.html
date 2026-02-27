@@ -202,7 +202,12 @@
         .shop-currency-select option { background:#1e1e1e; }
         .shop-date-input { background:#2c2c2e; border:none; border-radius:10px; padding:8px 10px; color:var(--text-gray); font-size:0.85rem; outline:none; font-family:inherit; width:100%; -webkit-appearance:none; }
         .shop-date-input::-webkit-calendar-picker-indicator { filter:invert(70%); cursor:pointer; }
-        .shop-item-row { display:flex; gap:6px; align-items:center; }
+        .shop-item-row { display:flex; gap:6px; align-items:center; transition: opacity 0.15s; }
+        .shop-item-row.dragging { opacity: 0.35; }
+        .shop-item-row.drag-over { border-top: 2px solid var(--accent-gray); margin-top: -2px; }
+        .shop-drag-handle { color: #555; cursor: grab; padding: 4px 3px; font-size: 1rem; flex-shrink: 0; touch-action: none; user-select: none; line-height:1; }
+        .shop-drag-handle:active { cursor: grabbing; color: #888; }
+        .shop-items-list { display:flex; flex-direction:column; gap:10px; }
         .shop-item-name { flex:2; background:#2c2c2e; border:none; border-radius:10px; padding:8px 12px; color:white; font-size:0.9rem; outline:none; font-family:inherit; }
         .shop-item-price { flex:1; background:#2c2c2e; border:none; border-radius:10px; padding:8px 10px; color:var(--accent-gray); font-size:0.9rem; outline:none; font-family:inherit; text-align:right; min-width:0; }
         .shop-item-del { background:none; border:none; color:#555; font-size:1rem; cursor:pointer; padding:4px; flex-shrink:0; }
@@ -298,9 +303,18 @@
             border-radius:10px; padding:9px 12px; color:#e8d5ff; font-size:0.88rem;
             outline:none; font-family:inherit; box-sizing:border-box; margin-bottom:8px;
         }
+        .astro-date-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+        .astro-date-input {
+            flex:1; background:rgba(255,255,255,0.07); border:1px solid rgba(200,150,255,0.25);
+            border-radius:10px; padding:8px 10px; color:#e8d5ff; font-size:0.85rem;
+            outline:none; font-family:inherit; min-width:0; -webkit-appearance:none;
+        }
+        .astro-date-input::-webkit-calendar-picker-indicator { filter:invert(70%) sepia(30%) saturate(300%) hue-rotate(220deg); cursor:pointer; }
+        .astro-date-sep { color:rgba(200,170,255,0.45); font-size:0.8rem; flex-shrink:0; }
         .astro-fortune-input::placeholder { color:rgba(200,170,255,0.28); }
-        .astro-save-btn { width:100%; background:linear-gradient(135deg,#6b3fa0,#3d1a6e); border:none; border-radius:10px; color:white; font-size:0.9rem; font-weight:bold; padding:10px; cursor:pointer; font-family:inherit; margin-top:8px; }
-        .astro-cancel-btn { width:100%; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1); border-radius:10px; color:rgba(255,255,255,0.45); font-size:0.88rem; padding:9px; cursor:pointer; font-family:inherit; margin-top:6px; }
+        .astro-save-btn { flex:1; background:linear-gradient(135deg,#6b3fa0,#3d1a6e); border:none; border-radius:10px; color:white; font-size:0.9rem; font-weight:bold; padding:10px; cursor:pointer; font-family:inherit; }
+        .astro-cancel-btn { flex:1; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1); border-radius:10px; color:rgba(255,255,255,0.45); font-size:0.88rem; padding:10px; cursor:pointer; font-family:inherit; }
+        .astro-btn-row { display:flex; gap:8px; margin-top:8px; }
 
         /* 星盤 */
         .astro-chart-tabs { display:flex; gap:6px; margin-bottom:12px; }
@@ -602,23 +616,94 @@
             document.body.classList.add('logged-in');
             document.getElementById('authUserName').textContent = user.displayName || user.email;
 
-            // onSnapshot：即時監聽，其他裝置存檔後立即同步
+            // ── 合併函式：把本地與雲端資料整合，不丟失任何一方的內容 ──
+            function mergeDb(local, cloud) {
+                const merged = JSON.parse(JSON.stringify(cloud)); // 以雲端為底
+
+                // 1. journals：逐日合併，同一天的條目以時間+內容去重
+                Object.entries(local.journals || {}).forEach(([date, entries]) => {
+                    if(!merged.journals[date]) {
+                        merged.journals[date] = entries;
+                    } else {
+                        const existing = new Set(
+                            merged.journals[date].map(j => j.time + '|' + j.text)
+                        );
+                        entries.forEach(j => {
+                            if(!existing.has(j.time + '|' + j.text)) {
+                                merged.journals[date].push(j);
+                            }
+                        });
+                        merged.journals[date].sort((a,b) => a.time.localeCompare(b.time));
+                    }
+                });
+
+                // 2. calendar：本地有值且雲端沒有的日期，保留本地
+                Object.entries(local.calendar || {}).forEach(([date, text]) => {
+                    if(text && !merged.calendar[date]) {
+                        merged.calendar[date] = text;
+                    }
+                });
+
+                // 3. bookmarks：逐分類合併，以內容去重
+                (local.catOrder || []).forEach(cat => {
+                    if(!merged.catOrder.includes(cat)) {
+                        merged.catOrder.push(cat);
+                        merged.bookmarks[cat] = local.bookmarks[cat] || [];
+                    } else {
+                        const existing = new Set(
+                            (merged.bookmarks[cat] || []).map(b => b.text)
+                        );
+                        (local.bookmarks[cat] || []).forEach(b => {
+                            if(!existing.has(b.text)) {
+                                merged.bookmarks[cat].push(b);
+                            }
+                        });
+                    }
+                });
+
+                // 4. shop：以 id 去重，本地有但雲端沒有的補上
+                const cloudShopIds = new Set((merged.shop || []).map(c => c.id));
+                (local.shop || []).forEach(card => {
+                    if(!cloudShopIds.has(card.id)) {
+                        merged.shop.push(card);
+                    }
+                });
+
+                // 5. astro：雲端為主，但本地若有雲端沒有的 chart 補上
+                if(local.astro?.charts) {
+                    const cloudChartIds = new Set((merged.astro?.charts || []).map(c => c.id));
+                    (local.astro.charts || []).forEach(chart => {
+                        if(!cloudChartIds.has(chart.id)) {
+                            merged.astro.charts.push(chart);
+                        }
+                    });
+                }
+
+                return merged;
+            }
+
+            // onSnapshot：即時監聽
             let appInited = false;
             firestoreDocRef.onSnapshot(snap => {
                 if(snap.exists && snap.data().data) {
                     const cloudDb = JSON.parse(snap.data().data);
-                    const countEntries = d => Object.values(d.journals || {}).flat().length;
-                    if(countEntries(cloudDb) >= countEntries(db)) {
+                    if(!appInited) {
+                        // 首次登入：合併離線資料與雲端資料
+                        db = mergeDb(db, cloudDb);
+                        if(!db.shop)  db.shop  = [];
+                        if(!db.astro) db.astro = {};
+                        localStorage.setItem('mega_v14_final_fix', JSON.stringify(db));
+                        // 把合併結果存回雲端
+                        firestoreDocRef.set({ data: JSON.stringify(db) });
+                    } else {
+                        // 已初始化後的更新（其他裝置觸發）：直接用雲端
                         db = cloudDb;
                         if(!db.shop)  db.shop  = [];
                         if(!db.astro) db.astro = {};
                         localStorage.setItem('mega_v14_final_fix', JSON.stringify(db));
-                        if(appInited) {
-                            // 已初始化：背景更新，不重新跳轉
-                            renderWeek(); renderList(); renderJournals();
-                            renderShopTabs(); renderShop();
-                            showSync('☁ 已從雲端同步');
-                        }
+                        renderWeek(); renderList(); renderJournals();
+                        renderShopTabs(); renderShop();
+                        showSync('☁ 已從雲端同步');
                     }
                 }
                 if(!appInited) { appInited = true; initApp(); }
@@ -1025,6 +1110,95 @@
     }
 
 
+
+    // ── 購物商品拖移排序 ─────────────────────────────────────────────
+    let shopDragSrcCardId = null;
+    let shopDragSrcIdx    = null;
+
+    function attachShopDragHandlers() {
+        document.querySelectorAll('.shop-item-row[draggable]').forEach(row => {
+            row.addEventListener('dragstart', e => {
+                shopDragSrcCardId = parseInt(row.dataset.cardId);
+                shopDragSrcIdx    = parseInt(row.dataset.idx);
+                row.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            row.addEventListener('dragend', () => {
+                row.classList.remove('dragging');
+                document.querySelectorAll('.shop-item-row.drag-over')
+                    .forEach(r => r.classList.remove('drag-over'));
+            });
+            row.addEventListener('dragover', e => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                document.querySelectorAll('.shop-item-row.drag-over')
+                    .forEach(r => r.classList.remove('drag-over'));
+                if(parseInt(row.dataset.idx) !== shopDragSrcIdx) {
+                    row.classList.add('drag-over');
+                }
+            });
+            row.addEventListener('drop', e => {
+                e.preventDefault();
+                const destIdx = parseInt(row.dataset.idx);
+                if(shopDragSrcIdx === null || shopDragSrcIdx === destIdx) return;
+                const card = db.shop.find(c => c.id === shopDragSrcCardId);
+                if(!card) return;
+                // 先從 DOM 同步目前輸入值
+                syncCardFromDOM(card);
+                // 重新排序 items
+                const moved = card.items.splice(shopDragSrcIdx, 1)[0];
+                card.items.splice(destIdx, 0, moved);
+                save();
+                renderShop();
+            });
+        });
+
+        // Touch 拖移（手機）
+        document.querySelectorAll('.shop-drag-handle').forEach(handle => {
+            let touchRow = null, touchSrcIdx = null, touchCardId = null, cloneEl = null;
+
+            handle.addEventListener('touchstart', e => {
+                touchRow    = handle.closest('.shop-item-row');
+                touchCardId = parseInt(touchRow.dataset.cardId);
+                touchSrcIdx = parseInt(touchRow.dataset.idx);
+                touchRow.classList.add('dragging');
+                // 建立視覺複製
+                cloneEl = touchRow.cloneNode(true);
+                cloneEl.style.cssText = 'position:fixed;z-index:9000;opacity:0.85;pointer-events:none;width:' + touchRow.offsetWidth + 'px;background:#2c2c2e;border-radius:10px;padding:6px;';
+                document.body.appendChild(cloneEl);
+            }, { passive: true });
+
+            handle.addEventListener('touchmove', e => {
+                e.preventDefault();
+                const t = e.touches[0];
+                if(cloneEl) { cloneEl.style.left = (t.clientX - 30) + 'px'; cloneEl.style.top = (t.clientY - 20) + 'px'; }
+                // 找到目前手指下的 row
+                document.querySelectorAll('.shop-item-row.drag-over').forEach(r => r.classList.remove('drag-over'));
+                const el = document.elementFromPoint(t.clientX, t.clientY);
+                const overRow = el?.closest('.shop-item-row[draggable]');
+                if(overRow && parseInt(overRow.dataset.idx) !== touchSrcIdx) overRow.classList.add('drag-over');
+            }, { passive: false });
+
+            handle.addEventListener('touchend', e => {
+                if(cloneEl) { cloneEl.remove(); cloneEl = null; }
+                if(touchRow) touchRow.classList.remove('dragging');
+                document.querySelectorAll('.shop-item-row.drag-over').forEach(r => r.classList.remove('drag-over'));
+                const t = e.changedTouches[0];
+                const el = document.elementFromPoint(t.clientX, t.clientY);
+                const destRow = el?.closest('.shop-item-row[draggable]');
+                if(!destRow) return;
+                const destIdx = parseInt(destRow.dataset.idx);
+                if(touchSrcIdx === null || touchSrcIdx === destIdx) return;
+                const card = db.shop.find(c => c.id === touchCardId);
+                if(!card) return;
+                syncCardFromDOM(card);
+                const moved = card.items.splice(touchSrcIdx, 1)[0];
+                card.items.splice(destIdx, 0, moved);
+                save(); renderShop();
+            });
+        });
+    }
+
     // ═══════════════ 購物記帳 ═══════════════
     const shopCats = ['全部', '3C', '衣物', '鞋包', '表演', '好市多', '其他'];
     const currencies = { 'TWD': 'NT$', 'JPY': '¥', 'KRW': '₩', 'USD': '$' };
@@ -1072,6 +1246,7 @@
         addBtn.onclick = addShopCard;
         grid.appendChild(addBtn);
         grid.scrollTop = grid.scrollHeight;
+        attachShopDragHandlers();
     }
 
     function buildEditCard(card) {
@@ -1101,17 +1276,18 @@
             </div>`;
         } else {
             const rows = (card.items||[{name:'',price:''}]).map((it,i) =>
-                `<div class="shop-item-row">
+                `<div class="shop-item-row" draggable="true" data-card-id="${card.id}" data-idx="${i}">
+                    <span class="shop-drag-handle">⠿</span>
                     <input class="shop-item-name" placeholder="商品名稱" value="${escHtml(it.name||'')}">
                     <input class="shop-item-price" placeholder="0" type="number" value="${escHtml(it.price||'')}">
                     <button class="shop-item-del" onclick="delShopItemDirect(${card.id},${i})">✕</button>
                 </div>`).join('');
-            return `<div class="shop-card-edit">
+            return `<div class="shop-card-edit" id="shopEdit_${card.id}">
                 <div class="shop-card-header">
                     <input type="date" class="shop-date-input" style="width:auto;flex:1;" value="${card.date||''}">
                     ${headerNote}${currSel}
                 </div>
-                ${rows}
+                <div class="shop-items-list" data-card-id="${card.id}">${rows}</div>
                 <button class="shop-add-item-btn" onclick="addShopItemDirect(${card.id})">＋ 新增商品</button>
                 ${btnRow}
             </div>`;
@@ -1370,11 +1546,15 @@
                 if(astroCurEditingId === item.id) {
                     itemEl.innerHTML = `
                         <input class="astro-fortune-input" id="curTitle_${item.id}" placeholder="星象名稱（如：水星逆行）" value="${aEsc(item.title)}">
-                        <input class="astro-fortune-input" id="curPeriod_${item.id}" placeholder="期間（如：3/15–4/7）" value="${aEsc(item.period)}">
+                        <div class="astro-date-row">
+                            <input type="date" class="astro-date-input" id="curDateStart_${item.id}" value="${item.dateStart||''}">
+                            <span class="astro-date-sep">～</span>
+                            <input type="date" class="astro-date-input" id="curDateEnd_${item.id}" value="${item.dateEnd||''}">
+                        </div>
                         <textarea class="astro-fortune-textarea" id="curText_${item.id}" rows="4" placeholder="詳細說明...">${aEsc(item.text)}</textarea>
-                        <div style="display:flex;gap:8px;margin-top:8px;">
-                            <button class="astro-cancel-btn" style="margin-top:0;" onclick="astroCurEditingId=null;renderAstroPanel()">取消</button>
-                            <button class="astro-save-btn" style="margin-top:0;" onclick="saveCurAstroItem(${item.id})">✦ 儲存</button>
+                        <div class="astro-btn-row">
+                            <button class="astro-cancel-btn" onclick="astroCurEditingId=null;renderAstroPanel()">取消</button>
+                            <button class="astro-save-btn" onclick="saveCurAstroItem(${item.id})">✦ 儲存</button>
                         </div>`;
                 } else {
                     itemEl.innerHTML = `
@@ -1414,10 +1594,23 @@
     }
     function saveCurAstroItem(id) {
         const item = db.astro.current.find(i=>i.id===id); if(!item) return;
-        item.title  = document.getElementById(`curTitle_${id}`)?.value.trim()||'';
-        item.period = document.getElementById(`curPeriod_${id}`)?.value.trim()||'';
-        item.text   = document.getElementById(`curText_${id}`)?.value.trim()||'';
+        item.title     = document.getElementById(`curTitle_${id}`)?.value.trim()||'';
+        item.dateStart = document.getElementById(`curDateStart_${id}`)?.value||'';
+        item.dateEnd   = document.getElementById(`curDateEnd_${id}`)?.value||'';
+        item.period    = fmtAstroPeriod(item.dateStart, item.dateEnd);
+        item.text      = document.getElementById(`curText_${id}`)?.value.trim()||'';
         save(); astroCurEditingId=null; renderAstroPanel();
+    }
+
+    function fmtAstroPeriod(start, end) {
+        const fmt = ds => {
+            if(!ds) return '';
+            const d = new Date(ds + 'T00:00:00');
+            return `${d.getFullYear()} 年 ${String(d.getMonth()+1).padStart(2,'0')} 月 ${String(d.getDate()).padStart(2,'0')} 日`;
+        };
+        const s = fmt(start), e = fmt(end);
+        if(s && e) return `${s} ～ ${e}`;
+        return s || e;
     }
     function delCurAstroItem(id) {
         if(!confirm('確定刪除此項目？')) return;
@@ -1498,8 +1691,10 @@
             <textarea class="astro-fortune-textarea" id="astro_${type}_text" rows="4" placeholder="整體${isMonth?'月':'週'}運勢概述...">${aEsc(data.text)}</textarea>
             <div style="font-size:0.7rem;color:rgba(200,170,255,0.55);letter-spacing:1.5px;margin:12px 0 6px;">各星座運勢</div>
             <div class="astro-signs-grid">${signsHtml}</div>
-            <button class="astro-save-btn" onclick="saveAstroFortune('${type}')">✦ 儲存</button>
-            <button class="astro-cancel-btn" onclick="cancelAstroFortune('${type}')">取消</button>`;
+            <div class="astro-btn-row">
+                <button class="astro-cancel-btn" onclick="cancelAstroFortune('${type}')">取消</button>
+                <button class="astro-save-btn" onclick="saveAstroFortune('${type}')">✦ 儲存</button>
+            </div>`;
     }
 
     function attachChipListeners(body, type) {
@@ -1630,8 +1825,10 @@
                     ${editRows}
                 </div>
                 <button class="astro-add-row-btn" onclick="addChartRow(${chart.id})">＋ 新增一列</button>
-                <button class="astro-save-btn" onclick="saveChartEdit(${chart.id})">✦ 儲存</button>
-                <button class="astro-cancel-btn" onclick="cancelChartEdit(${chart.id})">取消</button>`;
+                <div class="astro-btn-row">
+                    <button class="astro-cancel-btn" onclick="cancelChartEdit(${chart.id})">取消</button>
+                    <button class="astro-save-btn" onclick="saveChartEdit(${chart.id})">✦ 儲存</button>
+                </div>`;
         }
     }
 
