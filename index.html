@@ -632,6 +632,7 @@
     let currentUser    = null;
     let firestoreDocRef = null;
     let saveTimeout    = null;
+    let localWriteAt   = 0; // 最後一次本地寫入 Firestore 的時間戳
 
     // db：優先從 localStorage 讀（離線 cache）
     let db = JSON.parse(localStorage.getItem('mega_v14_final_fix')) || {
@@ -646,6 +647,7 @@
         if(!firestoreDocRef) return;
         clearTimeout(saveTimeout);
         saveTimeout = setTimeout(() => {
+            localWriteAt = Date.now();
             firestoreDocRef.set({ data: JSON.stringify(db) })
                 .then(()  => showSync('☁ 已同步'))
                 .catch(() => showSync('⚠ 同步失敗'));
@@ -764,7 +766,12 @@
                         // 把合併結果存回雲端
                         firestoreDocRef.set({ data: JSON.stringify(db) });
                     } else {
-                        // 已初始化後的更新（其他裝置觸發）：直接用雲端
+                        // 已初始化後的更新（其他裝置觸發）
+                        // 若距離上次本地寫入不足 4 秒，忽略（這是自己發出的回音）
+                        if(Date.now() - localWriteAt < 4000) {
+                            showSync('☁ 已同步');
+                            return;
+                        }
                         db = cloudDb;
                         if(!db.shop)  db.shop  = [];
                         if(!db.astro) db.astro = {};
