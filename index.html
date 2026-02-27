@@ -81,11 +81,44 @@
         }
         .text-bubble div[contenteditable="true"] { flex: 1; outline: none; word-break: break-word; white-space: pre-wrap; cursor: text; line-height: 1.4; }
         .jn-del-btn { background: none; border: none; color: #888; font-size: 1.1rem; cursor: pointer; padding: 0 5px; display: flex; align-items: center; }
-        .jn-sw-btn { background: none; border: none; color: #888; font-size: 0.78rem; cursor: pointer; padding: 2px 5px; display: flex; flex-direction: column; align-items: center; gap: 1px; line-height: 1; flex-shrink: 0; border-radius: 6px; }
-        .jn-sw-btn:active { background: #333; }
-        .jn-sw-btn.running { color: #f5c518; }
-        .jn-sw-display { font-size: 0.72rem; font-family: monospace; color: #666; min-width: 38px; text-align: center; }
-        .jn-sw-display.running { color: #f5c518; }
+        .jn-edit-textarea { background: #1e1e1e; border: none; border-radius: 10px; padding: 8px 10px; color: white; font-size: 1rem; outline: none; font-family: inherit; resize: none; overflow: hidden; min-height: 38px; max-height: 160px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; flex: 1; }
+        .jn-btn-row { display: flex; gap: 6px; margin-top: 8px; }
+        .jn-save-btn { flex: 1; background: var(--accent-gray); color: #000; border: none; border-radius: 10px; padding: 8px; font-size: 0.85rem; font-weight: bold; cursor: pointer; }
+        .jn-cancel-btn { flex: 1; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: rgba(255,255,255,0.45); font-size: 0.85rem; padding: 8px; cursor: pointer; }
+        .jn-sw-tag-del { background: none; border: none; color: #555; font-size: 0.65rem; cursor: pointer; padding: 0 0 0 4px; line-height: 1; vertical-align: middle; }
+        .jn-sw-tag-del:hover { color: #f55; }
+        /* 碼錶 */
+        .jn-sw-wrap {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 3px; flex-shrink: 0;
+        }
+        .jn-sw-circle {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: #333; border: 2px solid #444;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: background 0.15s, border-color 0.15s;
+            flex-shrink: 0;
+        }
+        .jn-sw-circle:active { background: #444; }
+        .jn-sw-circle.running {
+            background: rgba(245,197,24,0.15);
+            border-color: #f5c518;
+            box-shadow: 0 0 8px rgba(245,197,24,0.25);
+        }
+        .jn-sw-circle svg { color: #888; transition: color 0.15s; }
+        .jn-sw-circle.running svg { color: #f5c518; }
+        .jn-sw-digits {
+            font-family: monospace; font-size: 0.72rem;
+            color: #555; letter-spacing: 0.5px; line-height: 1;
+        }
+        .jn-sw-circle.running ~ .jn-sw-digits { color: #f5c518; }
+        .jn-sw-tags { display:flex; flex-direction:column; align-items:center; gap:3px; margin-top:2px; }
+        .jn-sw-tag {
+            background: #2a2a2a; border: 1px solid #3a3a3a;
+            border-radius: 8px; padding: 2px 7px;
+            font-family: monospace; font-size: 0.68rem;
+            color: #888; white-space: nowrap; line-height: 1.4;
+        }
 
         /* 輸入列佈局 */
         .input-bar { 
@@ -780,6 +813,8 @@
         if(idx === 5) renderJournals();
     }
 
+    let jnEditState = {}; // { 'date_i': true }
+
     function renderJournals() {
         const flow = document.getElementById('journalFlow'); if(!flow) return;
         const items = db.journals[activeDS] || [];
@@ -788,20 +823,51 @@
             const swState = swStates[activeDS + '_' + i];
             const isRunning = swState && swState.running;
             const elapsed = swState ? swState.elapsed : 0;
-            flow.innerHTML += `
+            const hasTags = swState && !swState.running && swState.duration;
+            const tagsHtml = hasTags ? `
+                <div class="jn-sw-tags">
+                    <span class="jn-sw-tag">⏱ ${swState.duration}</span>
+                    <span class="jn-sw-tag">${swState.startTime} → ${swState.endTime}</span>
+                </div>` : '';
+            const isEditing = !!jnEditState[activeDS + '_' + i];
+            const swCircle = `<div class="jn-sw-circle ${isRunning?'running':''}" id="swCap_${i}" onclick="toggleStopwatch(${i})">
+                ${isRunning
+                    ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="8" y1="5" x2="8" y2="19"/><line x1="16" y1="5" x2="16" y2="19"/></svg>'
+                    : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="13" x2="15" y2="15"/><line x1="9" y1="2" x2="15" y2="2"/><line x1="12" y1="2" x2="12" y2="5"/></svg>'}
+            </div>`;
+            const tagsHtmlFull = hasTags ? `
+                <div class="jn-sw-tags">
+                    <span class="jn-sw-tag">⏱ ${swState.duration}<button class="jn-sw-tag-del" onclick="clearSwTag(${i})">✕</button></span>
+                    <span class="jn-sw-tag">${swState.startTime} → ${swState.endTime}</span>
+                </div>` : '';
+            if(isEditing) {
+                flow.innerHTML += `
+                <div class="bubble-item" style="align-items:flex-start;">
+                    <input type="time" class="time-input" id="jnTimeEdit_${i}" value="${j.time}">
+                    <div class="text-bubble" style="flex-direction:column;align-items:stretch;gap:0;">
+                        <textarea class="jn-edit-textarea" id="jnTextEdit_${i}">${j.text.replace(/</g,'&lt;')}</textarea>
+                        <div class="jn-btn-row">
+                            <button class="jn-cancel-btn" onclick="jnEditState['${activeDS}_${i}']=false;renderJournals()">取消</button>
+                            <button class="jn-save-btn" onclick="saveJnEdit(${i})">儲存</button>
+                        </div>
+                    </div>
+                </div>`;
+                setTimeout(() => { const ta = document.getElementById(`jnTextEdit_${i}`); if(ta){ autoResize(ta); ta.oninput = ()=>autoResize(ta); ta.focus(); } }, 0);
+            } else {
+                flow.innerHTML += `
                 <div class="bubble-item">
                     <input type="time" class="time-input" value="${j.time}" onchange="updateJTime(${i}, this.value)">
                     <div class="text-bubble">
-                        <div contenteditable="true" onblur="updateJText(${i}, this.innerText)">${j.text}</div>
-                        <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;">
-                            <button class="jn-sw-btn ${isRunning?'running':''}" onclick="toggleStopwatch(${i})" title="碼錶">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><polyline points="12 9 12 13 14.5 15.5"/><path d="M9 2h6M12 2v3"/></svg>
-                            </button>
-                            <span class="jn-sw-display ${isRunning?'running':''}" id="swDisp_${i}">${fmtSw(elapsed)}</span>
+                        <div style="flex:1;word-break:break-word;white-space:pre-wrap;line-height:1.4;cursor:default;" ondblclick="jnEditState['${activeDS}_${i}']=true;renderJournals()">${j.text.replace(/</g,'&lt;')}</div>
+                        <div class="jn-sw-wrap">
+                            ${swCircle}
+                            <span class="jn-sw-digits" id="swDisp_${i}">${elapsed ? fmtSw(elapsed) : ''}</span>
+                            ${tagsHtmlFull}
                         </div>
                         <button class="jn-del-btn" onclick="delJournal(${i})">✕</button>
                     </div>
                 </div>`;
+            };
         });
         flow.scrollTop = flow.scrollHeight;
         updateInputTime();
@@ -823,35 +889,35 @@
 
     function toggleStopwatch(idx) {
         const key = activeDS + '_' + idx;
-        if(!swStates[key]) swStates[key] = { running: false, startAt: 0, elapsed: 0, interval: null };
+        if(!swStates[key]) swStates[key] = { running: false, startAt: 0, elapsed: 0, interval: null, startTime: '' };
         const sw = swStates[key];
 
         if(!sw.running) {
-            // 開始計時
+            // 開始計時：記錄開始的時鐘時間
             sw.running = true;
             sw.startAt = Date.now() - sw.elapsed;
+            sw.startTime = new Date().toTimeString().slice(0, 5);
             sw.interval = setInterval(() => {
                 sw.elapsed = Date.now() - sw.startAt;
                 const disp = document.getElementById(`swDisp_${idx}`);
                 if(disp) disp.textContent = fmtSw(sw.elapsed);
             }, 500);
-            // 更新按鈕樣式
-            const btn = document.querySelectorAll('.jn-sw-btn')[idx];
-            if(btn) { btn.classList.add('running'); }
-            const disp = document.getElementById(`swDisp_${idx}`);
-            if(disp) disp.classList.add('running');
+            // 更新圓形按鈕樣式
+            const cap = document.getElementById(`swCap_${idx}`);
+            if(cap) {
+                cap.classList.add('running');
+                cap.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="8" y1="5" x2="8" y2="19"/><line x1="16" y1="5" x2="16" y2="19"/></svg>';
+            }
         } else {
-            // 停止 → 把時間寫入文字
+            // 停止 → 新增兩筆氣泡
             clearInterval(sw.interval);
             sw.running = false;
-            const timeStr = fmtSw(sw.elapsed);
-            sw.elapsed = 0;
-            // 附加到該筆 journal text
-            const items = db.journals[activeDS];
-            if(items && items[idx]) {
-                items[idx].text = (items[idx].text ? items[idx].text + '\n' : '') + '⏱ ' + timeStr;
-                save();
-            }
+            const endTime   = new Date().toTimeString().slice(0, 5);
+            const startTime = sw.startTime || endTime;
+            sw.duration  = fmtSw(sw.elapsed);
+            sw.endTime   = endTime;
+            sw.elapsed   = 0;
+            sw.startTime = startTime; // 保留顯示用
             renderJournals();
         }
     }
@@ -884,6 +950,21 @@
     function changeDrawerMonth(dir) { drawerMonth.setMonth(drawerMonth.getMonth() + dir); renderMiniCal(); }
     function updateJTime(i, v) { db.journals[activeDS][i].time = v; save(); renderJournals(); }
     function updateJText(i, v) { db.journals[activeDS][i].text = v; save(); }
+    function saveJnEdit(i) {
+        const t = document.getElementById(`jnTimeEdit_${i}`)?.value;
+        const txt = document.getElementById(`jnTextEdit_${i}`)?.value || '';
+        if(db.journals[activeDS] && db.journals[activeDS][i]) {
+            if(t) db.journals[activeDS][i].time = t;
+            db.journals[activeDS][i].text = txt;
+        }
+        delete jnEditState[activeDS + '_' + i];
+        save(); renderJournals();
+    }
+    function clearSwTag(i) {
+        const key = activeDS + '_' + i;
+        if(swStates[key]) { swStates[key].duration = ''; swStates[key].startTime = ''; swStates[key].endTime = ''; }
+        renderJournals();
+    }
     function delJournal(i) { if(confirm("刪除？")){ db.journals[activeDS].splice(i,1); save(); renderJournals(); }}
     function exportData() { const blob = new Blob([JSON.stringify(db, null, 2)], {type: 'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Backup.json`; a.click(); }
     function triggerImport() { document.getElementById('importFile').click(); }
