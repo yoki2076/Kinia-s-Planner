@@ -208,7 +208,9 @@
         .shop-item-del { background:none; border:none; color:#555; font-size:1rem; cursor:pointer; padding:4px; flex-shrink:0; }
         .shop-add-item-btn { background:none; border:1px dashed #444; border-radius:10px; color:#666; font-size:0.85rem; padding:7px; cursor:pointer; width:100%; text-align:center; }
         .shop-add-item-btn:active { background:#252525; }
-        .shop-publish-btn { background:var(--accent-gray); color:#000; border:none; border-radius:10px; padding:10px; font-size:0.9rem; font-weight:bold; cursor:pointer; width:100%; }
+        .shop-publish-btn { background:var(--accent-gray); color:#000; border:none; border-radius:10px; padding:10px; font-size:0.9rem; font-weight:bold; cursor:pointer; flex:1; }
+        .shop-cancel-btn { background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1); border-radius:10px; color:rgba(255,255,255,0.45); font-size:0.9rem; padding:10px; cursor:pointer; flex:1; }
+        .shop-btn-row { display:flex; gap:8px; }
 
         /* 表演欄位 */
         .perf-row { display:flex; gap:8px; }
@@ -349,15 +351,27 @@
             box-shadow: 0 2px 12px rgba(0,0,0,0.4);
         }
         .auth-google-btn:active { opacity: 0.85; }
+        .auth-skip-btn {
+            background: none; border: 1px solid #444; color: #666;
+            border-radius: 12px; padding: 11px 28px;
+            font-size: 0.9rem; cursor: pointer; font-family: inherit;
+        }
+        .auth-skip-btn:active { background: #1a1a1a; }
         .auth-status {
             position: fixed; top: 0; left: 0; right: 0;
             background: #0d0d0d; color: var(--text-gray);
             font-size: 0.78rem; text-align: center;
-            padding: 5px 0; z-index: 1500;
+            padding: 5px 0; z-index: 1500; height: 28px;
             display: flex; align-items: center; justify-content: center; gap: 8px;
             border-bottom: 1px solid #222;
         }
-        .auth-status.hidden { display: none; }
+        .auth-status.hidden { display: none; height: 0; }
+        /* 登入後整體版面往下推 28px */
+        body.logged-in .container { top: 28px; }
+        body.logged-in .nav-bar { bottom: 0; }
+        @media (min-width: 768px) {
+            body.logged-in .container { top: 28px; height: calc(100vh - 28px); }
+        }
         .auth-user-dot { width: 7px; height: 7px; border-radius: 50%; background: #4caf50; flex-shrink: 0; }
         .auth-signout-btn { background: none; border: none; color: #555; font-size: 0.75rem; cursor: pointer; text-decoration: underline; }
         .sync-indicator {
@@ -393,6 +407,7 @@
         </svg>
         使用 Google 帳號登入
     </button>
+    <button class="auth-skip-btn" onclick="skipLogin()">暫時離線使用</button>
 </div>
 
 <!-- 登入狀態列 -->
@@ -568,6 +583,10 @@
         const provider = new firebase.auth.GoogleAuthProvider();
         auth.signInWithPopup(provider).catch(err => alert('登入失敗：' + err.message));
     }
+    function skipLogin() {
+        document.getElementById('authScreen').classList.add('hidden');
+        initApp();
+    }
     function signOut() {
         if(!confirm('確定登出？')) return;
         auth.signOut();
@@ -580,26 +599,39 @@
             firestoreDocRef = firestore.collection('planners').doc(user.uid);
             document.getElementById('authScreen').classList.add('hidden');
             document.getElementById('authStatus').classList.remove('hidden');
+            document.body.classList.add('logged-in');
             document.getElementById('authUserName').textContent = user.displayName || user.email;
 
-            firestoreDocRef.get().then(snap => {
+            // onSnapshot：即時監聽，其他裝置存檔後立即同步
+            let appInited = false;
+            firestoreDocRef.onSnapshot(snap => {
                 if(snap.exists && snap.data().data) {
                     const cloudDb = JSON.parse(snap.data().data);
-                    // 以 journals 總筆數判斷雲端是否較新
                     const countEntries = d => Object.values(d.journals || {}).flat().length;
                     if(countEntries(cloudDb) >= countEntries(db)) {
                         db = cloudDb;
                         if(!db.shop)  db.shop  = [];
                         if(!db.astro) db.astro = {};
                         localStorage.setItem('mega_v14_final_fix', JSON.stringify(db));
+                        if(appInited) {
+                            // 已初始化：背景更新，不重新跳轉
+                            renderWeek(); renderList(); renderJournals();
+                            renderShopTabs(); renderShop();
+                            showSync('☁ 已從雲端同步');
+                        }
                     }
                 }
-                initApp();
-            }).catch(() => initApp());
+                if(!appInited) { appInited = true; initApp(); }
+            }, () => { if(!appInited) { appInited = true; initApp(); } });
         } else {
             firestoreDocRef = null;
-            document.getElementById('authScreen').classList.remove('hidden');
+            // 若已跳過登入（authScreen 已是 hidden），不要再顯示
+            const authScreen = document.getElementById('authScreen');
+            if(!authScreen.classList.contains('hidden')) {
+                authScreen.classList.remove('hidden');
+            }
             document.getElementById('authStatus').classList.add('hidden');
+            document.body.classList.remove('logged-in');
         }
     });
     function getDS(d = new Date()) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
@@ -666,7 +698,7 @@
         activeDS = ds; const d = new Date(ds);
         document.getElementById('activeDateDisplay').innerText = `${d.getMonth()+1}月${d.getDate()}日 週${weekDaysShort[d.getDay()]}`;
         renderWeek(); renderMiniCal(); renderList(); renderJournals();
-        if(autoSwitch && window.innerWidth < 768) switchPanel(4);
+        if(autoSwitch && window.innerWidth < 768) switchPanel(5);
     }
     function updateCal(date, text) { db.calendar[date] = text; save(); document.querySelectorAll(`.sync-${date}`).forEach(el => el.innerText = text); }
     function changeWeek(dir) { const d = new Date(activeDS); d.setDate(d.getDate() + dir*7); selectDate(getDS(d), false); }
@@ -994,7 +1026,7 @@
 
 
     // ═══════════════ 購物記帳 ═══════════════
-    const shopCats = ['全部', '3C', '衣物', '鞋包', '表演', '其他'];
+    const shopCats = ['全部', '3C', '衣物', '鞋包', '表演', '好市多', '其他'];
     const currencies = { 'TWD': 'NT$', 'JPY': '¥', 'KRW': '₩', 'USD': '$' };
     let currentShopCat = '全部';
 
@@ -1044,8 +1076,13 @@
 
     function buildEditCard(card) {
         const isPerf = card.category === '表演';
+        const isNew = !card._wasPublished; // 從未發佈過 → 取消時直接刪除
         const headerNote = `<input class="shop-card-title" placeholder="${isPerf ? '備注' : '備注（地點、用途）'}" value="${escHtml(card.title||'')}">`;
         const currSel = `<select class="shop-currency-select">${['TWD','JPY','KRW','USD'].map(c=>`<option value="${c}" ${card.currency===c?'selected':''}>${c}</option>`).join('')}</select>`;
+        const btnRow = `<div class="shop-btn-row">
+            <button class="shop-cancel-btn" onclick="cancelShopCard(${card.id}, ${isNew})">取消</button>
+            <button class="shop-publish-btn" onclick="publishShopCard(${card.id})">儲存</button>
+        </div>`;
 
         if(isPerf) {
             return `<div class="shop-card-edit">
@@ -1060,7 +1097,7 @@
                 <input class="perf-field perf-venue" placeholder="場地" value="${escHtml(card.venue||'')}">
                 <input type="date" class="shop-date-input" placeholder="購買日期" value="${card.date||''}">
                 <input type="number" class="perf-price-input perf-price" placeholder="票價" value="${escHtml(card.price||'')}">
-                <button class="shop-publish-btn" onclick="publishShopCard(${card.id})">發佈</button>
+                ${btnRow}
             </div>`;
         } else {
             const rows = (card.items||[{name:'',price:''}]).map((it,i) =>
@@ -1076,7 +1113,7 @@
                 </div>
                 ${rows}
                 <button class="shop-add-item-btn" onclick="addShopItemDirect(${card.id})">＋ 新增商品</button>
-                <button class="shop-publish-btn" onclick="publishShopCard(${card.id})">發佈</button>
+                ${btnRow}
             </div>`;
         }
     }
@@ -1190,13 +1227,27 @@
         if(!card) return;
         syncCardFromDOM(card);
         card.published = true;
+        card._wasPublished = true;
         save(); renderShop();
     }
 
     function editShopCard(id) {
         const card = db.shop.find(c => c.id === id);
         if(!card) return;
+        card._wasPublished = true; // 已發佈過，取消時恢復
         card.published = false;
+        save(); renderShop();
+    }
+
+    function cancelShopCard(id, isNew) {
+        if(isNew) {
+            // 從未儲存過 → 直接刪掉
+            db.shop = db.shop.filter(c => c.id !== id);
+        } else {
+            // 已儲存過 → 恢復 published 狀態
+            const card = db.shop.find(c => c.id === id);
+            if(card) card.published = true;
+        }
         save(); renderShop();
     }
 
