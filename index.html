@@ -195,6 +195,16 @@
         .icon-btn { background: none; border: none; color: var(--accent-gray); cursor: pointer; padding: 5px; display: flex; align-items: center; justify-content: center; border-radius: 6px; opacity: 0.8; }
         .icon-btn:active { opacity: 1; background: #222; }
 
+
+        /* ── 購物月份導覽 ── */
+        .shop-month-bar { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; background:#0d0d0d; border-bottom:1px solid var(--border); flex-shrink:0; }
+        .shop-month-btn { background:none; border:none; color:var(--text-gray); font-size:1.1rem; cursor:pointer; padding:4px 10px; border-radius:6px; }
+        .shop-month-btn:active { background:#222; }
+        .shop-month-title { font-size:0.95rem; font-weight:bold; color:var(--accent-gray); letter-spacing:1px; }
+        .shop-month-total { font-size:0.8rem; color:#666; }
+        .shop-month-summary { display:flex; justify-content:space-between; align-items:center; padding:10px 16px 6px; flex-shrink:0; }
+        .shop-month-label { font-size:0.85rem; color:#777; }
+        .shop-month-amount { font-size:1rem; font-weight:bold; color:var(--accent-gray); }
         /* ── 購物記帳 ── */
         .shop-tabs { display:flex; gap:8px; padding:10px 14px; overflow-x:auto; background:#0a0a0a; border-bottom:1px solid var(--border); flex-shrink:0; scrollbar-width:none; }
         .shop-tabs::-webkit-scrollbar { display:none; }
@@ -500,6 +510,17 @@
             <button class="icon-btn" onclick="openSearch()">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             </button>
+        </div>
+        <div class="shop-month-bar">
+            <button class="shop-month-btn" onclick="changeShopMonth(-1)">◀</button>
+            <div style="text-align:center;">
+                <div class="shop-month-title" id="shopMonthTitle" onclick="shopViewMonth=new Date();renderShopTabs();renderShop();" style="cursor:pointer;" title="點擊回到本月">—</div>
+            </div>
+            <button class="shop-month-btn" onclick="changeShopMonth(1)">▶</button>
+        </div>
+        <div class="shop-month-summary" id="shopMonthSummary" style="display:none;">
+            <span class="shop-month-label">本月合計</span>
+            <span class="shop-month-amount" id="shopMonthAmount"></span>
         </div>
         <div class="shop-tabs" id="shopTabs"></div>
         <div class="shop-grid" id="shopGrid"></div>
@@ -1185,7 +1206,7 @@
                             const d = new Date(date);
                             viewMonth = new Date(d); drawerMonth = new Date(d);
                             selectDate(date, false);
-                            switchPanel(4);
+                            switchPanel(5);
                             setTimeout(() => {
                                 const flow = document.getElementById('journalFlow');
                                 if (flow) flow.scrollTop = 0;
@@ -1227,6 +1248,87 @@
                             currentCat = cat;
                             switchPanel(2);
                         }
+                    });
+                }
+            });
+        });
+
+        // 購物
+        (db.shop || []).forEach(card => {
+            const fields = [];
+            if(card.title)   fields.push(card.title);
+            if(card.program) fields.push(card.program);
+            if(card.venue)   fields.push(card.venue);
+            if(card.zone)    fields.push(card.zone);
+            if(card.seat)    fields.push(card.seat);
+            (card.items || []).forEach(it => { if(it.name) fields.push(it.name); });
+            const combined = fields.join(' ');
+            if(combined.toLowerCase().includes(kwLower)) {
+                const sortDate = getShopSortDate(card);
+                const displayText = card.category === '表演'
+                    ? (card.program || card.title || '（未命名）')
+                    : (card.title || (card.items||[]).map(it=>it.name).filter(Boolean).join('、') || '（未命名）');
+                searchItems.push({
+                    type: '購物・' + (card.category || ''), date: sortDate, text: displayText,
+                    meta: sortDate + (card.currency ? '　' + (currencies[card.currency]||card.currency) : ''),
+                    action: () => {
+                        closeSearch();
+                        if(sortDate) shopViewMonth = new Date(sortDate.slice(0,7) + '-01T00:00:00');
+                        currentShopCat = card.category || '全部';
+                        switchPanel(3);
+                    }
+                });
+            }
+        });
+
+        // 星象：當前星象
+        if(Array.isArray(db.astro?.current)) {
+            db.astro.current.forEach(item => {
+                const combined = [item.title, item.period, item.text].filter(Boolean).join(' ');
+                if(combined.toLowerCase().includes(kwLower)) {
+                    searchItems.push({
+                        type: '星象・當前', date: item.dateStart || '', text: item.title || item.text || '（未命名）',
+                        meta: item.period || '',
+                        action: () => { closeSearch(); switchPanel(4); }
+                    });
+                }
+            });
+        }
+
+        // 星象：月/週運勢
+        ['month', 'week'].forEach(type => {
+            const data = db.astro?.[type];
+            if(!data) return;
+            const label = type === 'month' ? '月運勢' : '週運勢';
+            const combined = [data.period, data.text, ...Object.values(data.signs||{})].filter(Boolean).join(' ');
+            if(combined.toLowerCase().includes(kwLower)) {
+                searchItems.push({
+                    type: '星象・' + label, date: '', text: data.text || data.period || label,
+                    meta: data.period || '',
+                    action: () => { closeSearch(); switchPanel(4); }
+                });
+            }
+            // 各星座
+            Object.entries(data.signs || {}).forEach(([sign, text]) => {
+                if(text && text.toLowerCase().includes(kwLower)) {
+                    searchItems.push({
+                        type: `星象・${label}・${sign}`, date: '', text,
+                        meta: data.period || '',
+                        action: () => { closeSearch(); switchPanel(4); }
+                    });
+                }
+            });
+        });
+
+        // 星盤
+        (db.astro?.charts || []).forEach(chart => {
+            [...(chart.positions||[]), ...(chart.houses||[])].forEach(row => {
+                const combined = Object.values(row).join(' ');
+                if(combined.toLowerCase().includes(kwLower)) {
+                    searchItems.push({
+                        type: '星盤・' + (chart.name || ''), date: '', text: combined,
+                        meta: chart.name || '',
+                        action: () => { closeSearch(); switchPanel(4); }
                     });
                 }
             });
@@ -1347,6 +1449,17 @@
 
     // ═══════════════ 購物記帳 ═══════════════
     const shopCats = ['全部', '3C', '衣物', '鞋包', '表演', '好市多', '其他'];
+    let shopViewMonth = new Date(); // 當前檢視的年月
+
+    function changeShopMonth(dir) {
+        shopViewMonth = new Date(shopViewMonth.getFullYear(), shopViewMonth.getMonth() + dir, 1);
+        renderShopTabs(); renderShop();
+    }
+
+    function getShopMonthPrefix() {
+        const y = shopViewMonth.getFullYear(), m = shopViewMonth.getMonth() + 1;
+        return `${y}-${String(m).padStart(2,'0')}`;
+    }
     const currencies = { 'TWD': 'NT$', 'JPY': '¥', 'KRW': '₩', 'USD': '$' };
     let currentShopCat = '全部';
 
@@ -1370,10 +1483,48 @@
 
     function renderShop() {
         const grid = document.getElementById('shopGrid'); if(!grid) return;
-        let cards = currentShopCat === '全部'
-            ? [...db.shop]
-            : db.shop.filter(c => c.category === currentShopCat);
+        const prefix = getShopMonthPrefix();
+        const y = shopViewMonth.getFullYear(), m = shopViewMonth.getMonth() + 1;
+
+        // 更新 header 月份標題
+        const titleEl = document.getElementById('shopMonthTitle');
+        if(titleEl) titleEl.textContent = `${y} 年 ${String(m).padStart(2,'0')} 月`;
+
+        // 過濾：先過濾月份，再過濾分類
+        let cards = db.shop.filter(c => {
+            const sortDate = getShopSortDate(c);
+            return sortDate.startsWith(prefix) || (!c.published && !sortDate); // 未發佈草稿也顯示
+        });
+        if(currentShopCat !== '全部') cards = cards.filter(c => c.category === currentShopCat);
         cards.sort((a,b) => getShopSortDate(a).localeCompare(getShopSortDate(b)));
+
+        // 計算當月已發佈 TWD 合計（只計 TWD，其他幣別標注）
+        const summary = {};
+        cards.filter(c => c.published).forEach(card => {
+            const cur = card.currency || 'TWD';
+            let amt = 0;
+            if(card.category === '表演') {
+                amt = parseFloat(card.price) || 0;
+            } else {
+                amt = (card.items||[]).reduce((s,it) => s + (parseFloat(it.price)||0), 0);
+            }
+            if(!summary[cur]) summary[cur] = 0;
+            summary[cur] += amt;
+        });
+        const summaryEl = document.getElementById('shopMonthSummary');
+        const amtEl = document.getElementById('shopMonthAmount');
+        const publishedCards = cards.filter(c => c.published);
+        if(summaryEl && amtEl) {
+            if(publishedCards.length > 0) {
+                summaryEl.style.display = 'flex';
+                amtEl.textContent = Object.entries(summary)
+                    .map(([cur, amt]) => (currencies[cur]||cur) + amt.toLocaleString())
+                    .join('　');
+            } else {
+                summaryEl.style.display = 'none';
+            }
+        }
+
         grid.innerHTML = '';
         cards.forEach(card => {
             const div = document.createElement('div');
@@ -1391,7 +1542,7 @@
         addBtn.textContent = '＋ 新增記帳';
         addBtn.onclick = addShopCard;
         grid.appendChild(addBtn);
-        grid.scrollTop = grid.scrollHeight;
+        grid.scrollTop = 0;
         attachShopDragHandlers();
     }
 
@@ -2053,7 +2204,7 @@
 <!-- 搜尋介面 -->
 <div class="search-overlay" id="searchOverlay">
     <div class="search-header">
-        <input class="search-input" id="searchInput" placeholder="搜尋時間軸、行事曆、書籤..." oninput="doSearch(this.value)" autocomplete="off">
+        <input class="search-input" id="searchInput" placeholder="搜尋時間軸、行事曆、書籤、購物、星象..." oninput="doSearch(this.value)" autocomplete="off">
         <button class="search-cancel" onclick="closeSearch()">取消</button>
     </div>
     <div class="search-results" id="searchResults">
