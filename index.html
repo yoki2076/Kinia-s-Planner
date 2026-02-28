@@ -518,26 +518,6 @@
 <div class="sync-indicator" id="syncIndicator">☁ 已同步</div>
 
 <div class="container" id="mainContainer">
-        <div class="panel" id="photoPanel">
-        <div class="photo-cal-header">
-            <button class="photo-cal-btn" onclick="changePhotoMonth(-1)">◀</button>
-            <div class="photo-cal-title" id="photoMonthTitle" onclick="photoViewMonth=new Date();renderPhotoCalendar();" title="點擊回到本月">—</div>
-            <button class="photo-cal-btn" onclick="changePhotoMonth(1)">▶</button>
-        </div>
-        <div class="photo-cal-grid-wrap">
-            <div class="photo-cal-weekdays">
-                <div class="photo-cal-wd weekend">日</div>
-                <div class="photo-cal-wd">一</div>
-                <div class="photo-cal-wd">二</div>
-                <div class="photo-cal-wd">三</div>
-                <div class="photo-cal-wd">四</div>
-                <div class="photo-cal-wd">五</div>
-                <div class="photo-cal-wd weekend">六</div>
-            </div>
-            <div class="photo-cal-grid" id="photoCalGrid"></div>
-        </div>
-    </div>
-
     <div class="panel" id="weekPanel">
         <div class="header">
             <button class="btn-sm" onclick="changeWeek(-1)">◀ 上一週</button>
@@ -587,6 +567,7 @@
         </div>
     </div>
 
+
     <div class="panel" id="shopPanel">
         <div class="header">
             <span style="font-weight:bold;flex:1;">購物記帳</span>
@@ -609,12 +590,46 @@
         <div class="shop-grid" id="shopGrid"></div>
     </div>
 
+    <!-- ══════════ 星象版面 ══════════ -->
     <div class="panel" id="astroPanel">
         <div class="header">
             <span style="font-weight:bold;flex:1;">✦ 星象</span>
         </div>
         <div class="astro-panel-scroll" id="astroPanelScroll"></div>
     </div>
+
+
+    <!-- ══════════ 照片月曆 ══════════ -->
+    <div class="panel" id="photoPanel">
+        <div class="photo-cal-header">
+            <button class="photo-cal-btn" onclick="changePhotoMonth(-1)">◀</button>
+            <div class="photo-cal-title" id="photoMonthTitle" onclick="photoViewMonth=new Date();renderPhotoCalendar();" title="點擊回到本月">—</div>
+            <button class="photo-cal-btn" onclick="changePhotoMonth(1)">▶</button>
+        </div>
+        <div class="photo-cal-grid-wrap">
+            <div class="photo-cal-weekdays">
+                <div class="photo-cal-wd weekend">日</div>
+                <div class="photo-cal-wd">一</div>
+                <div class="photo-cal-wd">二</div>
+                <div class="photo-cal-wd">三</div>
+                <div class="photo-cal-wd">四</div>
+                <div class="photo-cal-wd">五</div>
+                <div class="photo-cal-wd weekend">六</div>
+            </div>
+            <div class="photo-cal-grid" id="photoCalGrid"></div>
+        </div>
+    </div>
+
+    <!-- 照片預覽 overlay -->
+    <div class="photo-preview-overlay hidden" id="photoPreviewOverlay" onclick="closePhotoPreview(event)">
+        <img class="photo-preview-img" id="photoPreviewImg" src="" alt="">
+        <div class="photo-preview-date" id="photoPreviewDate"></div>
+        <div class="photo-preview-btns">
+            <button class="photo-preview-del" onclick="deletePhoto(currentPreviewDate)">🗑 刪除</button>
+            <button class="photo-preview-close" onclick="closePhotoPreview()">關閉</button>
+        </div>
+    </div>
+    <input type="file" accept="image/*" id="photoFileInput" style="display:none" onchange="handlePhotoUpload(event)">
 
     <div class="panel" id="journalPanel">
         <div class="header">
@@ -648,12 +663,12 @@
 </div>
 
 <div class="nav-bar">
-    <button class="nav-item active" onclick="switchPanel(0)">相簿</button>
-    <button class="nav-item" onclick="switchPanel(1)">週曆</button>
-    <button class="nav-item" onclick="switchPanel(2)">行事曆</button>
-    <button class="nav-item" onclick="switchPanel(3)">書籤</button>
-    <button class="nav-item" onclick="switchPanel(4)">購物</button>
-    <button class="nav-item" onclick="switchPanel(5)">星象</button>
+    <button class="nav-item active" onclick="switchPanel(0)">週曆</button>
+    <button class="nav-item" onclick="switchPanel(1)">行事曆</button>
+    <button class="nav-item" onclick="switchPanel(2)">書籤</button>
+    <button class="nav-item" onclick="switchPanel(3)">購物</button>
+    <button class="nav-item" onclick="switchPanel(4)">星象</button>
+    <button class="nav-item" onclick="switchPanel(5)">相簿</button>
     <button class="nav-item" onclick="switchPanel(6)">時間軸</button>
     <div class="auth-status hidden" id="authStatus">
         <div style="display:flex;align-items:center;gap:2px;">
@@ -857,11 +872,11 @@
         if (window.innerWidth < 768) {
             document.getElementById('mainContainer').style.transform = `translateX(-${idx * 100}vw)`;
         } else {
-            ['photoPanel', 'weekPanel', 'listPanel', 'bookmarkPanel', 'shopPanel', 'astroPanel'].forEach((id, i) => {
+            ['weekPanel', 'listPanel', 'bookmarkPanel', 'shopPanel', 'astroPanel', 'photoPanel'].forEach((id, i) => {
                 const el = document.getElementById(id);
                 if(el) el.classList.toggle('active-left', i === idx);
             });
-            if(idx === 6) switchPanel(1);
+            if(idx === 6) switchPanel(0);
         }
         document.querySelectorAll('.nav-item').forEach((b, i) => b.classList.toggle('active', i === idx));
         if(idx === 0) renderWeek();
@@ -1002,7 +1017,7 @@
         activeDS = ds; const d = new Date(ds);
         document.getElementById('activeDateDisplay').innerText = `${d.getMonth()+1}月${d.getDate()}日 週${weekDaysShort[d.getDay()]}`;
         renderWeek(); renderMiniCal(); renderList(); renderJournals();
-        if(autoSwitch && window.innerWidth < 768) switchPanel(0);
+        if(autoSwitch && window.innerWidth < 768) switchPanel(5);
     }
     function updateCal(date, text) { db.calendar[date] = text; save(); document.querySelectorAll(`.sync-${date}`).forEach(el => el.innerText = text); }
     function changeWeek(dir) { const d = new Date(activeDS); d.setDate(d.getDate() + dir*7); selectDate(getDS(d), false); }
@@ -1410,7 +1425,7 @@
                             const d = new Date(date);
                             viewMonth = new Date(d); drawerMonth = new Date(d);
                             selectDate(date, false);
-                            switchPanel(0);
+                            switchPanel(5);
                             setTimeout(() => {
                                 const flow = document.getElementById('journalFlow');
                                 if (flow) flow.scrollTop = 0;
@@ -1431,7 +1446,7 @@
                         const d = new Date(date);
                         viewMonth = new Date(d);
                         selectDate(date, false);
-                        switchPanel(2);
+                        switchPanel(1);
                         setTimeout(() => {
                             const el = document.getElementById('list-' + date);
                             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1450,7 +1465,7 @@
                         action: () => {
                             closeSearch();
                             currentCat = cat;
-                            switchPanel(3);
+                            switchPanel(2);
                         }
                     });
                 }
@@ -1479,7 +1494,7 @@
                         closeSearch();
                         if(sortDate) shopViewMonth = new Date(sortDate.slice(0,7) + '-01T00:00:00');
                         currentShopCat = card.category || '全部';
-                        switchPanel(4);
+                        switchPanel(3);
                     }
                 });
             }
@@ -1493,7 +1508,7 @@
                     searchItems.push({
                         type: '星象・當前', date: item.dateStart || '', text: item.title || item.text || '（未命名）',
                         meta: item.period || '',
-                        action: () => { closeSearch(); switchPanel(5); }
+                        action: () => { closeSearch(); switchPanel(4); }
                     });
                 }
             });
@@ -1509,7 +1524,7 @@
                 searchItems.push({
                     type: '星象・' + label, date: '', text: data.text || data.period || label,
                     meta: data.period || '',
-                    action: () => { closeSearch(); switchPanel(5); }
+                    action: () => { closeSearch(); switchPanel(4); }
                 });
             }
             // 各星座
@@ -1518,7 +1533,7 @@
                     searchItems.push({
                         type: `星象・${label}・${sign}`, date: '', text,
                         meta: data.period || '',
-                        action: () => { closeSearch(); switchPanel(5); }
+                        action: () => { closeSearch(); switchPanel(4); }
                     });
                 }
             });
@@ -1532,7 +1547,7 @@
                     searchItems.push({
                         type: '星盤・' + (chart.name || ''), date: '', text: combined,
                         meta: chart.name || '',
-                        action: () => { closeSearch(); switchPanel(5); }
+                        action: () => { closeSearch(); switchPanel(4); }
                     });
                 }
             });
@@ -2503,8 +2518,8 @@
         currentCat = db.catOrder[0] || "我的筆記";
         goToday();
         renderShopTabs(); renderShop();
-        if(window.innerWidth >= 768) switchPanel(1);
-        else switchPanel(1);
+        if(window.innerWidth >= 768) switchPanel(0);
+        else switchPanel(0);
         updateInputTime();
         setInterval(() => {
             if(document.activeElement !== document.getElementById('jnTimeInput')) updateInputTime();
