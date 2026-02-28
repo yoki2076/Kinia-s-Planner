@@ -429,21 +429,15 @@
         }
         .auth-skip-btn:active { background: #1a1a1a; }
         .auth-status {
-            position: fixed; top: 10px; right: 12px;
-            background: rgba(20,20,20,0.88);
-            backdrop-filter: blur(8px);
-            border: 1px solid #333;
-            border-radius: 20px;
-            color: var(--text-gray);
-            font-size: 0.72rem;
-            padding: 4px 10px 4px 8px;
-            z-index: 1500;
-            display: flex; align-items: center; gap: 6px;
-            pointer-events: auto;
+            flex: 1; display: flex; flex-direction: column; align-items: center;
+            justify-content: center; gap: 2px;
+            border-left: 1px solid #222;
+            padding: 4px 2px;
         }
         .auth-status.hidden { display: none; }
-        .auth-user-dot { width: 6px; height: 6px; border-radius: 50%; background: #4caf50; flex-shrink: 0; }
-        .auth-signout-btn { background: none; border: none; color: #555; font-size: 0.7rem; cursor: pointer; text-decoration: underline; padding: 0; }
+        .auth-user-name { font-size: 0.65rem; color: #aaa; max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .auth-user-dot { width: 5px; height: 5px; border-radius: 50%; background: #4caf50; display: inline-block; margin-right: 3px; flex-shrink: 0; }
+        .auth-signout-btn { background: none; border: none; color: #555; font-size: 0.6rem; cursor: pointer; text-decoration: underline; padding: 0; line-height: 1; }
         .sync-indicator {
             position: fixed; bottom: 68px; right: 14px;
             background: #1e1e1e; border: 1px solid #333;
@@ -481,11 +475,6 @@
 </div>
 
 <!-- 登入狀態列 -->
-<div class="auth-status hidden" id="authStatus">
-    <span class="auth-user-dot"></span>
-    <span id="authUserName"></span>
-    <button class="auth-signout-btn" onclick="signOut()">登出</button>
-</div>
 
 <!-- 同步提示 -->
 <div class="sync-indicator" id="syncIndicator">☁ 已同步</div>
@@ -609,6 +598,13 @@
     <button class="nav-item" onclick="switchPanel(3)">購物</button>
     <button class="nav-item" onclick="switchPanel(4)">星象</button>
     <button class="nav-item" onclick="switchPanel(5)">時間軸</button>
+    <div class="auth-status hidden" id="authStatus">
+        <div style="display:flex;align-items:center;gap:2px;">
+            <span class="auth-user-dot"></span>
+            <span class="auth-user-name" id="authUserName"></span>
+        </div>
+        <button class="auth-signout-btn" onclick="signOut()">登出</button>
+    </div>
 </div>
 
 <script>
