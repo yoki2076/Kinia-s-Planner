@@ -37,7 +37,7 @@
         .container { 
             display: flex; 
             height: calc(100vh - 60px); 
-            width: 700vw; 
+            width: 600vw; 
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
             position: fixed;
             top: 0;
@@ -229,7 +229,7 @@
             #weekPanel, #listPanel, #bookmarkPanel, #shopPanel, #astroPanel, #photoPanel { display: none; }
             #weekPanel.active-left, #listPanel.active-left, #bookmarkPanel.active-left, #shopPanel.active-left, #astroPanel.active-left, #photoPanel.active-left { display: flex; }
             .nav-bar { width: 35%; }
-            .nav-item:nth-child(7) { display: none; }
+            .nav-item:nth-child(6) { display: none; }
         }
 
         /* --- 搜尋 --- */
@@ -644,38 +644,6 @@
     </div>
 
 
-    <!-- ══════════ 照片月曆 ══════════ -->
-    <div class="panel" id="photoPanel">
-        <div class="photo-cal-header">
-            <button class="photo-cal-btn" onclick="changePhotoMonth(-1)">◀</button>
-            <div class="photo-cal-title" id="photoMonthTitle" onclick="photoViewMonth=new Date();renderPhotoCalendar();" title="點擊回到本月">—</div>
-            <button class="photo-cal-btn" onclick="changePhotoMonth(1)">▶</button>
-        </div>
-        <div class="photo-cal-grid-wrap">
-            <div class="photo-cal-weekdays">
-                <div class="photo-cal-wd weekend">日</div>
-                <div class="photo-cal-wd">一</div>
-                <div class="photo-cal-wd">二</div>
-                <div class="photo-cal-wd">三</div>
-                <div class="photo-cal-wd">四</div>
-                <div class="photo-cal-wd">五</div>
-                <div class="photo-cal-wd weekend">六</div>
-            </div>
-            <div class="photo-cal-grid" id="photoCalGrid"></div>
-        </div>
-    </div>
-
-    <!-- 照片預覽 overlay -->
-    <div class="photo-preview-overlay hidden" id="photoPreviewOverlay" onclick="closePhotoPreview(event)">
-        <img class="photo-preview-img" id="photoPreviewImg" src="" alt="">
-        <div class="photo-preview-date" id="photoPreviewDate"></div>
-        <div class="photo-preview-btns">
-            <button class="photo-preview-del" onclick="deletePhoto(currentPreviewDate)">🗑 刪除</button>
-            <button class="photo-preview-close" onclick="closePhotoPreview()">關閉</button>
-        </div>
-    </div>
-    <input type="file" accept="image/*" id="photoFileInput" style="display:none" onchange="handlePhotoUpload(event)">
-
     <div class="panel" id="journalPanel">
         <div class="header">
             <div onclick="toggleCalendar()" style="cursor:pointer; flex:1;">
@@ -705,7 +673,39 @@
             <button class="add-circle" onclick="addJournal()">+</button>
         </div>
     </div>
+
+    <!-- ══════════ 照片月曆 ══════════ -->
+    <div class="panel" id="photoPanel">
+        <div class="photo-cal-header">
+            <button class="photo-cal-btn" onclick="changePhotoMonth(-1)">◀</button>
+            <div class="photo-cal-title" id="photoMonthTitle" onclick="photoViewMonth=new Date();renderPhotoCalendar();" title="點擊回到本月">—</div>
+            <button class="photo-cal-btn" onclick="changePhotoMonth(1)">▶</button>
+        </div>
+        <div class="photo-cal-grid-wrap">
+            <div class="photo-cal-weekdays">
+                <div class="photo-cal-wd weekend">日</div>
+                <div class="photo-cal-wd">一</div>
+                <div class="photo-cal-wd">二</div>
+                <div class="photo-cal-wd">三</div>
+                <div class="photo-cal-wd">四</div>
+                <div class="photo-cal-wd">五</div>
+                <div class="photo-cal-wd weekend">六</div>
+            </div>
+            <div class="photo-cal-grid" id="photoCalGrid"></div>
+        </div>
+    </div>
 </div>
+
+<!-- 照片預覽 overlay -->
+<div class="photo-preview-overlay hidden" id="photoPreviewOverlay" onclick="closePhotoPreview(event)">
+    <img class="photo-preview-img" id="photoPreviewImg" src="" alt="">
+    <div class="photo-preview-date" id="photoPreviewDate"></div>
+    <div class="photo-preview-btns">
+        <button class="photo-preview-del" onclick="deletePhoto(currentPreviewDate)">🗑 刪除</button>
+        <button class="photo-preview-close" onclick="closePhotoPreview()">關閉</button>
+    </div>
+</div>
+<input type="file" accept="image/*" id="photoFileInput" style="display:none" onchange="handlePhotoUpload(event)">
 
 <div class="nav-bar">
     <button class="nav-item active" onclick="switchPanel(0)">週曆</button>
@@ -713,8 +713,7 @@
     <button class="nav-item" onclick="switchPanel(2)">書籤</button>
     <button class="nav-item" onclick="switchPanel(3)">購物</button>
     <button class="nav-item" onclick="switchPanel(4)">星象</button>
-    <button class="nav-item" onclick="switchPanel(5)">相簿</button>
-    <button class="nav-item" onclick="switchPanel(6)">時間軸</button>
+    <button class="nav-item" onclick="switchPanel(5)">時間軸</button>
     <div class="auth-status hidden" id="authStatus">
         <div style="display:flex;align-items:center;gap:2px;">
             <span class="auth-user-dot"></span>
@@ -921,7 +920,7 @@
                 const el = document.getElementById(id);
                 if(el) el.classList.toggle('active-left', i === idx);
             });
-            if(idx === 6) switchPanel(0);
+            if(idx === 5) switchPanel(0);
         }
         document.querySelectorAll('.nav-item').forEach((b, i) => b.classList.toggle('active', i === idx));
         if(idx === 0) renderWeek();
@@ -929,8 +928,7 @@
         if(idx === 2) renderBookmarkUI();
         if(idx === 3) { renderShopTabs(); renderShop(); }
         if(idx === 4) renderAstroPanel();
-        if(idx === 5) renderPhotoCalendar();
-        if(idx === 6) renderJournals();
+        if(idx === 5) renderJournals();
     }
 
     let jnEditState = {}; // { 'date_i': true }
