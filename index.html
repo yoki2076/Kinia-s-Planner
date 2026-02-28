@@ -429,22 +429,21 @@
         }
         .auth-skip-btn:active { background: #1a1a1a; }
         .auth-status {
-            position: fixed; top: 0; left: 0; right: 0;
-            background: #0d0d0d; color: var(--text-gray);
-            font-size: 0.78rem; text-align: center;
-            padding: 5px 0; z-index: 1500; height: 28px;
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-            border-bottom: 1px solid #222;
+            position: fixed; top: 10px; right: 12px;
+            background: rgba(20,20,20,0.88);
+            backdrop-filter: blur(8px);
+            border: 1px solid #333;
+            border-radius: 20px;
+            color: var(--text-gray);
+            font-size: 0.72rem;
+            padding: 4px 10px 4px 8px;
+            z-index: 1500;
+            display: flex; align-items: center; gap: 6px;
+            pointer-events: auto;
         }
-        .auth-status.hidden { display: none; height: 0; }
-        /* 登入後整體版面往下推 28px */
-        body.logged-in .container { top: 28px; }
-        body.logged-in .nav-bar { bottom: 0; }
-        @media (min-width: 768px) {
-            body.logged-in .container { top: 28px; height: calc(100vh - 28px); }
-        }
-        .auth-user-dot { width: 7px; height: 7px; border-radius: 50%; background: #4caf50; flex-shrink: 0; }
-        .auth-signout-btn { background: none; border: none; color: #555; font-size: 0.75rem; cursor: pointer; text-decoration: underline; }
+        .auth-status.hidden { display: none; }
+        .auth-user-dot { width: 6px; height: 6px; border-radius: 50%; background: #4caf50; flex-shrink: 0; }
+        .auth-signout-btn { background: none; border: none; color: #555; font-size: 0.7rem; cursor: pointer; text-decoration: underline; padding: 0; }
         .sync-indicator {
             position: fixed; bottom: 68px; right: 14px;
             background: #1e1e1e; border: 1px solid #333;
@@ -683,7 +682,7 @@
             firestoreDocRef = firestore.collection('planners').doc(user.uid);
             document.getElementById('authScreen').classList.add('hidden');
             document.getElementById('authStatus').classList.remove('hidden');
-            document.body.classList.add('logged-in');
+            // body.logged-in no longer needed (auth badge is floating)
             document.getElementById('authUserName').textContent = user.displayName || user.email;
 
             // ── 合併函式：把本地與雲端資料整合，不丟失任何一方的內容 ──
@@ -791,7 +790,7 @@
                 authScreen.classList.remove('hidden');
             }
             document.getElementById('authStatus').classList.add('hidden');
-            document.body.classList.remove('logged-in');
+            // body.logged-in no longer needed
         }
     });
     function getDS(d = new Date()) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
