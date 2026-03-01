@@ -863,11 +863,14 @@
                     <div class="text-bubble">
                         <div style="flex:1;word-break:break-word;white-space:pre-wrap;line-height:1.4;cursor:default;" ondblclick="jnEditState['${activeDS}_${i}']=true;renderJournals()">${j.text.replace(/</g,'&lt;')}</div>
                         <div class="jn-sw-wrap">
-                            ${swCircle}
+                            <div style="display:flex;align-items:center;gap:4px;">
+                                ${swCircle}
+                                ${hasTags ? `<button class="jn-del-btn" onclick="delJournal(${i})">✕</button>` : ''}
+                            </div>
                             <span class="jn-sw-digits" id="swDisp_${i}">${elapsed ? fmtSw(elapsed) : ''}</span>
                             ${tagsHtmlFull}
                         </div>
-                        <button class="jn-del-btn" onclick="delJournal(${i})">✕</button>
+                        ${!hasTags ? `<button class="jn-del-btn" onclick="delJournal(${i})">✕</button>` : ''}
                     </div>
                 </div>`;
             };
