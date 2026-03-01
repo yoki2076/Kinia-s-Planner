@@ -825,11 +825,12 @@
             const swState = swStates[activeDS + '_' + i];
             const isRunning = swState && swState.running;
             const elapsed = swState ? swState.elapsed : 0;
-            const hasTags = swState && !swState.running && swState.duration;
+            // 標籤從 db 讀取（可持久化＆雲端同步）
+            const hasTags = !isRunning && j.swDuration;
             const tagsHtml = hasTags ? `
                 <div class="jn-sw-tags">
-                    <span class="jn-sw-tag">⏱ ${swState.duration}</span>
-                    <span class="jn-sw-tag">${swState.startTime} → ${swState.endTime}</span>
+                    <span class="jn-sw-tag">⏱ ${j.swDuration}</span>
+                    <span class="jn-sw-tag">${j.swStartTime} → ${j.swEndTime}</span>
                 </div>` : '';
             const isEditing = !!jnEditState[activeDS + '_' + i];
             const swCircle = `<div class="jn-sw-circle ${isRunning?'running':''}" id="swCap_${i}" onclick="toggleStopwatch(${i})">
@@ -839,8 +840,8 @@
             </div>`;
             const tagsHtmlFull = hasTags ? `
                 <div class="jn-sw-tags">
-                    <span class="jn-sw-tag">⏱ ${swState.duration}<button class="jn-sw-tag-del" onclick="clearSwTag(${i})">✕</button></span>
-                    <span class="jn-sw-tag">${swState.startTime} → ${swState.endTime}</span>
+                    <span class="jn-sw-tag">⏱ ${j.swDuration}<button class="jn-sw-tag-del" onclick="clearSwTag(${i})">✕</button></span>
+                    <span class="jn-sw-tag">${j.swStartTime} → ${j.swEndTime}</span>
                 </div>` : '';
             if(isEditing) {
                 flow.innerHTML += `
@@ -877,7 +878,7 @@
 
 
     // ── 碼錶 ──────────────────────────────────────────────────
-    // swStates: { 'YYYY-MM-DD_i': { running, startAt, elapsed, interval } }
+    // swStates: 只存計時中的 runtime 狀態（不需持久化）
     const swStates = {};
 
     function fmtSw(ms) {
@@ -911,15 +912,23 @@
                 cap.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="8" y1="5" x2="8" y2="19"/><line x1="16" y1="5" x2="16" y2="19"/></svg>';
             }
         } else {
-            // 停止 → 新增兩筆氣泡
+            // 停止 → 把標籤存進 db.journals 的該筆資料
             clearInterval(sw.interval);
             sw.running = false;
             const endTime   = new Date().toTimeString().slice(0, 5);
             const startTime = sw.startTime || endTime;
-            sw.duration  = fmtSw(sw.elapsed);
-            sw.endTime   = endTime;
+            const duration  = fmtSw(sw.elapsed);
             sw.elapsed   = 0;
-            sw.startTime = startTime; // 保留顯示用
+            sw.startTime = '';
+
+            // 寫入 db，讓標籤持久化並同步雲端
+            const items = db.journals[activeDS];
+            if(items && items[idx]) {
+                items[idx].swDuration  = duration;
+                items[idx].swStartTime = startTime;
+                items[idx].swEndTime   = endTime;
+                save();
+            }
             renderJournals();
         }
     }
@@ -963,8 +972,13 @@
         save(); renderJournals();
     }
     function clearSwTag(i) {
-        const key = activeDS + '_' + i;
-        if(swStates[key]) { swStates[key].duration = ''; swStates[key].startTime = ''; swStates[key].endTime = ''; }
+        const items = db.journals[activeDS];
+        if(items && items[i]) {
+            delete items[i].swDuration;
+            delete items[i].swStartTime;
+            delete items[i].swEndTime;
+            save();
+        }
         renderJournals();
     }
     function delJournal(i) { if(confirm("刪除？")){ db.journals[activeDS].splice(i,1); save(); renderJournals(); }}
