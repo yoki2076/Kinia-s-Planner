@@ -396,6 +396,37 @@
         .astro-chart-name-input { width:100%; background:rgba(255,255,255,0.07); border:1px solid rgba(200,150,255,0.25); border-radius:10px; padding:9px 12px; color:#e8d5ff; font-size:0.95rem; font-weight:bold; outline:none; font-family:inherit; box-sizing:border-box; margin-bottom:10px; }
         .astro-chart-name-input::placeholder { color:rgba(200,170,255,0.25); }
 
+        /* 當前星象項目 collapse & drag */
+        .cur-astro-item {
+            margin-bottom:8px; border-radius:12px;
+            border:1px solid rgba(200,150,255,0.15);
+            background:rgba(255,255,255,0.03);
+            transition:background 0.15s;
+            position:relative;
+        }
+        .cur-astro-item.drag-over { border-top:2px solid rgba(200,150,255,0.6); margin-top:-2px; }
+        .cur-astro-item.dragging { opacity:0.35; }
+        .cur-item-header {
+            display:flex; align-items:center; gap:8px;
+            padding:11px 12px; cursor:pointer; user-select:none;
+        }
+        .cur-item-drag-handle {
+            color:rgba(200,150,255,0.35); cursor:grab; font-size:1rem;
+            flex-shrink:0; touch-action:none; user-select:none; line-height:1;
+            padding:2px 3px;
+        }
+        .cur-item-drag-handle:active { cursor:grabbing; color:rgba(200,150,255,0.7); }
+        .cur-item-title-wrap { flex:1; min-width:0; }
+        .cur-item-title { font-size:0.88rem; font-weight:bold; color:#d4aaff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .cur-item-period { font-size:0.72rem; color:rgba(180,150,255,0.55); margin-top:2px; }
+        .cur-item-arrow { color:rgba(200,170,255,0.45); font-size:0.6rem; transition:transform 0.22s; flex-shrink:0; }
+        .cur-item-arrow.open { transform:rotate(180deg); }
+        .cur-item-body { padding:0 12px 12px 36px; }
+        .cur-item-body.hidden { display:none; }
+        .cur-item-preview { font-size:0.75rem; color:rgba(200,170,255,0.4); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+        .cur-item-text { font-size:0.88rem; color:#e8d5ff; line-height:1.6; white-space:pre-wrap; word-break:break-word; }
+        .cur-item-actions { display:flex; gap:8px; margin-top:10px; }
+
         /* 星座 chips */
         .astro-signs-row { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
         .astro-sign-chip { background:rgba(255,255,255,0.07); border:1px solid rgba(200,150,255,0.2); border-radius:20px; padding:4px 11px; font-size:0.75rem; color:rgba(220,200,255,0.7); cursor:pointer; white-space:nowrap; }
@@ -1942,6 +1973,11 @@
         if(!scroll) return;
         scroll.innerHTML = '';
 
+        // 同步展開狀態
+        if(db.astro.itemExpanded) {
+            Object.assign(astroCurExpanded, db.astro.itemExpanded);
+        }
+
         // 當前星象
         scroll.appendChild(buildCurrentAstroSection());
         // 月運勢
@@ -1962,6 +1998,8 @@
 
     // ── 當前星象 ──
     let astroCurEditingId = null; // null=不在編輯, id=編輯中的項目id
+    // 每個子項目的展開狀態（itemId -> bool）
+    let astroCurExpanded = {};
 
     function buildCurrentAstroSection() {
         const key = 'current';
@@ -1998,50 +2036,199 @@
         if(items.length === 0) {
             body.innerHTML = `<div class="astro-fortune-empty">尚未新增星象項目，點「＋ 新增」開始 ✨</div>`;
         } else {
-            items.forEach(item => {
-                const itemEl = document.createElement('div');
-                itemEl.style.cssText = 'margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid rgba(200,150,255,0.1);';
-                itemEl.id = `curItem_${item.id}`;
-
-                if(astroCurEditingId === item.id) {
-                    itemEl.innerHTML = `
-                        <input class="astro-fortune-input" id="curTitle_${item.id}" placeholder="星象名稱（如：水星逆行）" value="${aEsc(item.title)}">
+            if(astroCurEditingId !== null) {
+                // 編輯模式：直接顯示編輯表單（不在卡片內）
+                const editItem = items.find(i=>i.id===astroCurEditingId);
+                if(editItem) {
+                    const editEl = document.createElement('div');
+                    editEl.style.cssText = 'margin-bottom:12px;padding:12px;border-radius:12px;border:1px solid rgba(200,150,255,0.3);background:rgba(150,80,255,0.07);';
+                    editEl.id = `curItem_${editItem.id}`;
+                    editEl.innerHTML = `
+                        <input class="astro-fortune-input" id="curTitle_${editItem.id}" placeholder="星象名稱（如：水星逆行）" value="${aEsc(editItem.title)}">
                         <div class="astro-date-row">
-                            <input type="date" class="astro-date-input" id="curDateStart_${item.id}" value="${item.dateStart||''}">
+                            <input type="date" class="astro-date-input" id="curDateStart_${editItem.id}" value="${editItem.dateStart||''}">
                             <span class="astro-date-sep">～</span>
-                            <input type="date" class="astro-date-input" id="curDateEnd_${item.id}" value="${item.dateEnd||''}">
+                            <input type="date" class="astro-date-input" id="curDateEnd_${editItem.id}" value="${editItem.dateEnd||''}">
                         </div>
-                        <textarea class="astro-fortune-textarea" id="curText_${item.id}" rows="4" placeholder="詳細說明...">${aEsc(item.text)}</textarea>
+                        <textarea class="astro-fortune-textarea" id="curText_${editItem.id}" rows="4" placeholder="詳細說明...">${aEsc(editItem.text)}</textarea>
                         <div class="astro-btn-row">
-                            <button class="astro-icon-btn" style="padding:9px 12px;color:rgba(255,100,100,0.7);border:1px solid rgba(255,100,100,0.25);" onclick="delCurAstroItem(${item.id})">刪除</button>
+                            <button class="astro-icon-btn" style="padding:9px 12px;color:rgba(255,100,100,0.7);border:1px solid rgba(255,100,100,0.25);" onclick="delCurAstroItem(${editItem.id})">刪除</button>
                             <button class="astro-cancel-btn" onclick="astroCurEditingId=null;renderAstroPanel()">取消</button>
-                            <button class="astro-save-btn" onclick="saveCurAstroItem(${item.id})">✦ 儲存</button>
+                            <button class="astro-save-btn" onclick="saveCurAstroItem(${editItem.id})">✦ 儲存</button>
                         </div>`;
-                } else {
-                    itemEl.style.cursor = 'default';
-                    itemEl.innerHTML = `
-                        <div style="font-size:0.9rem;font-weight:bold;color:#d4aaff;margin-bottom:3px;">${item.title ? aEsc(item.title) : '（未命名）'}</div>
-                        ${item.period ? `<div class="astro-fortune-period" style="margin-bottom:6px;">📅 ${aEsc(item.period)}</div>` : ''}
-                        ${item.text ? `<div class="astro-fortune-text" style="font-size:0.9rem;">${aEsc(item.text)}</div>` : ''}`;
-                    itemEl.ondblclick = () => { astroCurEditingId = item.id; renderAstroPanel(); };
+                    body.appendChild(editEl);
                 }
-                body.appendChild(itemEl);
-            });
-            // 最後一個不要底線
-            const last = body.lastElementChild;
-            if(last) last.style.borderBottom = 'none';
+                // 其他項目仍顯示收合卡片
+                items.filter(i=>i.id!==astroCurEditingId).forEach(item => {
+                    body.appendChild(buildCurAstroItemEl(item));
+                });
+            } else {
+                items.forEach(item => {
+                    body.appendChild(buildCurAstroItemEl(item));
+                });
+            }
         }
 
         inner.appendChild(header);
         inner.appendChild(body);
         section.appendChild(inner);
+
+        // 拖曳排序
+        setTimeout(() => attachCurAstroDrag(body), 0);
+
         return section;
+    }
+
+    function buildCurAstroItemEl(item) {
+        const expanded = !!astroCurExpanded[item.id];
+        const itemEl = document.createElement('div');
+        itemEl.className = 'cur-astro-item';
+        itemEl.id = `curItem_${item.id}`;
+        itemEl.setAttribute('data-cur-id', item.id);
+        itemEl.draggable = true;
+
+        const headerDiv = document.createElement('div');
+        const firstLine = item.text ? aEsc(item.text.split('\n')[0]) : '';
+
+        headerDiv.className = 'cur-item-header';
+        headerDiv.innerHTML = `
+            <span class="cur-item-drag-handle" data-drag-handle="1">⠿</span>
+            <div class="cur-item-title-wrap">
+                <div class="cur-item-title">${item.title ? aEsc(item.title) : '（未命名）'}</div>
+                ${item.period ? `<div class="cur-item-period">📅 ${aEsc(item.period)}</div>` : ''}
+                ${!expanded && firstLine ? `<div class="cur-item-preview">${firstLine}</div>` : ''}
+            </div>
+            <span class="cur-item-arrow ${expanded?'open':''}">▲</span>`;
+
+        const bodyDiv = document.createElement('div');
+        bodyDiv.className = `cur-item-body${expanded?'':' hidden'}`;
+        bodyDiv.innerHTML = `
+            ${item.text ? `<div class="cur-item-text">${aEsc(item.text)}</div>` : `<div class="astro-fortune-empty" style="font-size:0.82rem;">尚無說明</div>`}
+            <div class="cur-item-actions">
+                <button class="astro-cancel-btn" style="font-size:0.8rem;padding:7px 12px;" onclick="event.stopPropagation();delCurAstroItemConfirm(${item.id})">刪除</button>
+                <button class="astro-save-btn" style="font-size:0.8rem;padding:7px 12px;" onclick="event.stopPropagation();astroCurEditingId=${item.id};astroCurExpanded[${item.id}]=false;renderAstroPanel()">編輯 ✎</button>
+            </div>`;
+
+        headerDiv.onclick = (e) => {
+            if(e.target.dataset.dragHandle) return;
+            astroCurExpanded[item.id] = !astroCurExpanded[item.id];
+            if(!db.astro.itemExpanded) db.astro.itemExpanded = {};
+            db.astro.itemExpanded[item.id] = astroCurExpanded[item.id];
+            save();
+            const arrow = headerDiv.querySelector('.cur-item-arrow');
+            const titleWrap = headerDiv.querySelector('.cur-item-title-wrap');
+            if(astroCurExpanded[item.id]) {
+                bodyDiv.classList.remove('hidden');
+                if(arrow) arrow.classList.add('open');
+                // 展開時移除預覽行
+                const prev = titleWrap.querySelector('.cur-item-preview');
+                if(prev) prev.remove();
+            } else {
+                bodyDiv.classList.add('hidden');
+                if(arrow) arrow.classList.remove('open');
+                // 收起時補回預覽行
+                if(firstLine && !titleWrap.querySelector('.cur-item-preview')) {
+                    const prevEl = document.createElement('div');
+                    prevEl.className = 'cur-item-preview';
+                    prevEl.innerHTML = firstLine;
+                    titleWrap.appendChild(prevEl);
+                }
+            }
+        };
+
+        itemEl.appendChild(headerDiv);
+        itemEl.appendChild(bodyDiv);
+        return itemEl;
+    }
+
+    // ── 拖曳排序 ──
+    let _curDragId = null;
+
+    function attachCurAstroDrag(container) {
+        let touchSrcId = null, touchLastY = 0;
+
+        container.querySelectorAll('.cur-astro-item').forEach(el => {
+            el.addEventListener('dragstart', e => {
+                _curDragId = parseInt(el.dataset.curId);
+                el.classList.add('dragging');
+            });
+            el.addEventListener('dragend', () => {
+                el.classList.remove('dragging');
+                container.querySelectorAll('.cur-astro-item').forEach(e=>e.classList.remove('drag-over'));
+            });
+            el.addEventListener('dragover', e => {
+                e.preventDefault();
+                container.querySelectorAll('.cur-astro-item').forEach(e=>e.classList.remove('drag-over'));
+                el.classList.add('drag-over');
+            });
+            el.addEventListener('drop', e => {
+                e.preventDefault();
+                const destId = parseInt(el.dataset.curId);
+                if(_curDragId === null || _curDragId === destId) return;
+                const arr = db.astro.current;
+                const fromIdx = arr.findIndex(i=>i.id===_curDragId);
+                const toIdx   = arr.findIndex(i=>i.id===destId);
+                if(fromIdx<0||toIdx<0) return;
+                const moved = arr.splice(fromIdx,1)[0];
+                arr.splice(toIdx,0,moved);
+                save(); renderAstroPanel();
+            });
+
+            // 觸控拖曳
+            const handle = el.querySelector('.cur-item-drag-handle');
+            if(handle) {
+                handle.addEventListener('touchstart', e => {
+                    touchSrcId = parseInt(el.dataset.curId);
+                    touchLastY = e.touches[0].clientY;
+                    el.classList.add('dragging');
+                    e.preventDefault();
+                }, {passive:false});
+            }
+        });
+
+        container.addEventListener('touchmove', e => {
+            if(touchSrcId === null) return;
+            e.preventDefault();
+            const y = e.touches[0].clientY;
+            const els = [...container.querySelectorAll('.cur-astro-item')];
+            container.querySelectorAll('.cur-astro-item').forEach(e=>e.classList.remove('drag-over'));
+            const target = els.find(el => {
+                const r = el.getBoundingClientRect();
+                return y >= r.top && y <= r.bottom;
+            });
+            if(target) target.classList.add('drag-over');
+        }, {passive:false});
+
+        container.addEventListener('touchend', e => {
+            if(touchSrcId === null) return;
+            const y = e.changedTouches[0].clientY;
+            const els = [...container.querySelectorAll('.cur-astro-item')];
+            const target = els.find(el => {
+                const r = el.getBoundingClientRect();
+                return y >= r.top && y <= r.bottom;
+            });
+            if(target) {
+                const destId = parseInt(target.dataset.curId);
+                if(touchSrcId !== destId) {
+                    const arr = db.astro.current;
+                    const fromIdx = arr.findIndex(i=>i.id===touchSrcId);
+                    const toIdx   = arr.findIndex(i=>i.id===destId);
+                    if(fromIdx>=0 && toIdx>=0) {
+                        const moved = arr.splice(fromIdx,1)[0];
+                        arr.splice(toIdx,0,moved);
+                        save(); renderAstroPanel();
+                    }
+                }
+            }
+            touchSrcId = null;
+            container.querySelectorAll('.cur-astro-item').forEach(e=>e.classList.remove('dragging','drag-over'));
+        });
     }
 
     function addCurAstroItem() {
         if(!Array.isArray(db.astro.current)) db.astro.current = [];
         const newId = Date.now();
-        db.astro.current.push({id: newId, title:'', period:'', text:''});
+        db.astro.current.push({id: newId, title:'', period:'', dateStart:'', dateEnd:'', text:''});
         astroCurEditingId = newId;
         db.astro.collapsed['current'] = false;
         save(); renderAstroPanel();
@@ -2054,7 +2241,17 @@
         item.dateEnd   = document.getElementById(`curDateEnd_${id}`)?.value||'';
         item.period    = fmtAstroPeriod(item.dateStart, item.dateEnd);
         item.text      = document.getElementById(`curText_${id}`)?.value.trim()||'';
+        // 儲存後自動展開該項目
+        astroCurExpanded[id] = true;
+        if(!db.astro.itemExpanded) db.astro.itemExpanded = {};
+        db.astro.itemExpanded[id] = true;
         save(); astroCurEditingId=null; renderAstroPanel();
+    }
+    function delCurAstroItemConfirm(id) {
+        if(!confirm('確定刪除此項目？')) return;
+        db.astro.current = db.astro.current.filter(i=>i.id!==id);
+        delete astroCurExpanded[id];
+        save(); renderAstroPanel();
     }
 
     function fmtAstroPeriod(start, end) {
@@ -2070,6 +2267,7 @@
     function delCurAstroItem(id) {
         if(!confirm('確定刪除此項目？')) return;
         db.astro.current = db.astro.current.filter(i=>i.id!==id);
+        delete astroCurExpanded[id];
         save(); renderAstroPanel();
     }
 
