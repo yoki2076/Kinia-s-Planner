@@ -556,6 +556,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 </head>
 <body>
 
@@ -771,6 +772,7 @@
     firebase.initializeApp(firebaseConfig);
     const auth      = firebase.auth();
     const firestore = firebase.firestore();
+    const storage   = firebase.storage();
     let currentUser    = null;
     let firestoreDocRef = null;
     let saveTimeout    = null;
@@ -1870,22 +1872,40 @@
 
     function handlePhotoUpload(e) {
         const file = e.target.files[0]; if(!file || !pendingPhotoDate) return;
+        if(!currentUser) { alert('請先登入才能上傳照片'); return; }
+
+        // 先壓縮再上傳到 Firebase Storage
         const reader = new FileReader();
         reader.onload = ev => {
-            // 縮小圖片以節省 localStorage
             const img = new Image();
             img.onload = () => {
-                const MAX = 600;
+                const MAX = 1200;
                 const ratio = Math.min(MAX/img.width, MAX/img.height, 1);
                 const canvas = document.createElement('canvas');
                 canvas.width  = Math.round(img.width  * ratio);
                 canvas.height = Math.round(img.height * ratio);
                 canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-                const data = canvas.toDataURL('image/jpeg', 0.7);
-                if(!db.photos) db.photos = {};
-                db.photos[pendingPhotoDate] = data;
-                save();
-                renderPhotoCalendar();
+
+                canvas.toBlob(blob => {
+                    const ds = pendingPhotoDate;
+                    const path = `photos/${currentUser.uid}/${ds}.jpg`;
+                    const ref = storage.ref(path);
+
+                    showSync('⬆ 上傳中...');
+                    ref.put(blob, { contentType: 'image/jpeg' })
+                        .then(() => ref.getDownloadURL())
+                        .then(url => {
+                            if(!db.photos) db.photos = {};
+                            db.photos[ds] = url;  // 存 URL，不存 base64
+                            save();
+                            renderPhotoCalendar();
+                            showSync('☁ 已同步');
+                        })
+                        .catch(err => {
+                            showSync('⚠ 上傳失敗');
+                            console.error('Storage 上傳失敗:', err);
+                        });
+                }, 'image/jpeg', 0.82);
             };
             img.src = ev.target.result;
         };
@@ -1909,6 +1929,18 @@
 
     function deletePhoto(ds) {
         if(!ds || !confirm('刪除這張照片？')) return;
+
+        // 若有登入，同步從 Firebase Storage 刪除
+        if(currentUser && db.photos && db.photos[ds]) {
+            const url = db.photos[ds];
+            // 只有 Storage URL（非 base64）才嘗試刪除
+            if(url.startsWith('https://')) {
+                try {
+                    storage.refFromURL(url).delete().catch(() => {});
+                } catch(e) {}
+            }
+        }
+
         delete db.photos[ds];
         save();
         document.getElementById('photoPreviewOverlay').classList.add('hidden');
@@ -2832,9 +2864,7 @@
         }, 60000);
     }
 
-    window.onload = () => {
-        // Auth 監聽已在宣告時啟動，登入後自動呼叫 initApp()
-    };
+    // Auth 監聽已在宣告時啟動，登入後自動呼叫 initApp()
 </script>
 
 <!-- 搜尋介面 -->
