@@ -556,7 +556,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js%22%3E%3C/script%3E
 </head>
 <body>
 
@@ -789,6 +789,7 @@
     function save() {
         localStorage.setItem('mega_v14_final_fix', JSON.stringify(db));
         if(!firestoreDocRef) return;
+        localWriteAt = Date.now(); // 排程時就標記，防止連續操作時回音誤判
         clearTimeout(saveTimeout);
         saveTimeout = setTimeout(() => {
             localWriteAt = Date.now();
@@ -893,6 +894,14 @@
                     });
                 }
 
+                // 6. photos：本地有但雲端沒有的日期，補上（保留兩方照片）
+                Object.entries(local.photos || {}).forEach(([date, val]) => {
+                    if(val && !merged.photos?.[date]) {
+                        if(!merged.photos) merged.photos = {};
+                        merged.photos[date] = val;
+                    }
+                });
+
                 return merged;
             }
 
@@ -917,10 +926,13 @@
                             return;
                         }
                         db = cloudDb;
-                        if(!db.shop)  db.shop  = [];
-                        if(!db.astro) db.astro = {};
+                        if(!db.shop)   db.shop   = [];
+                        if(!db.astro)  db.astro  = {};
+                        if(!db.photos) db.photos = {};
                         localStorage.setItem('mega_v14_final_fix', JSON.stringify(db));
                         renderWeek(); renderList(); renderJournals();
+                        renderBookmarkUI(); renderAstroPanel();
+                        renderPhotoCalendar(); renderWeekPhotoCal();
                         renderShopTabs(); renderShop();
                         showSync('☁ 已從雲端同步');
                     }
@@ -1945,7 +1957,7 @@ function deletePhoto(ds) {
     const photoVal = db.photos?.[ds];
 
     // 如果是 Storage URL（非 base64），同步刪除 Storage 檔案
-    if (currentUser && photoVal && photoVal.startsWith('https://')) {
+    if (currentUser && photoVal && photoVal.startsWith('https://'))/ {
         const path = `photos/${currentUser.uid}/${ds}.jpg`;
         storage.ref(path).delete().catch(err => console.warn('Storage 刪除失敗', err));
     }
