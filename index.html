@@ -556,6 +556,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 </head>
 <body>
 
@@ -771,6 +772,7 @@
     firebase.initializeApp(firebaseConfig);
     const auth      = firebase.auth();
     const firestore = firebase.firestore();
+    const storage   = firebase.storage();
     let currentUser    = null;
     let firestoreDocRef = null;
     let saveTimeout    = null;
@@ -1868,29 +1870,59 @@
         document.getElementById('photoFileInput').click();
     }
 
-    function handlePhotoUpload(e) {
-        const file = e.target.files[0]; if(!file || !pendingPhotoDate) return;
-        const reader = new FileReader();
-        reader.onload = ev => {
-            // 縮小圖片以節省 localStorage
-            const img = new Image();
-            img.onload = () => {
-                const MAX = 600;
-                const ratio = Math.min(MAX/img.width, MAX/img.height, 1);
-                const canvas = document.createElement('canvas');
-                canvas.width  = Math.round(img.width  * ratio);
-                canvas.height = Math.round(img.height * ratio);
-                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-                const data = canvas.toDataURL('image/jpeg', 0.7);
-                if(!db.photos) db.photos = {};
-                db.photos[pendingPhotoDate] = data;
-                save();
-                renderPhotoCalendar();
-            };
-            img.src = ev.target.result;
+function handlePhotoUpload(e) {
+    const file = e.target.files[0];
+    if (!file || !pendingPhotoDate) return;
+
+    // 先壓縮圖片再上傳
+    const reader = new FileReader();
+    reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+            const MAX = 1200;
+            const ratio = Math.min(MAX / img.width, MAX / img.height, 1);
+            const canvas = document.createElement('canvas');
+            canvas.width  = Math.round(img.width  * ratio);
+            canvas.height = Math.round(img.height * ratio);
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            canvas.toBlob(blob => {
+                if (!currentUser) {
+                    // 離線模式：仍用 base64 存 localStorage
+                    const reader2 = new FileReader();
+                    reader2.onload = ev2 => {
+                        if (!db.photos) db.photos = {};
+                        db.photos[pendingPhotoDate] = ev2.target.result;
+                        save();
+                        renderPhotoCalendar();
+                        renderWeekPhotoCal();
+                    };
+                    reader2.readAsDataURL(blob);
+                    return;
+                }
+
+                // 登入模式：上傳到 Firebase Storage
+                const path = `photos/${currentUser.uid}/${pendingPhotoDate}.jpg`;
+                const ref  = storage.ref(path);
+
+                showSync('⬆ 上傳中...');
+                ref.put(blob).then(() => ref.getDownloadURL()).then(url => {
+                    if (!db.photos) db.photos = {};
+                    db.photos[pendingPhotoDate] = url; // 存 URL 而非 base64
+                    save();
+                    renderPhotoCalendar();
+                    renderWeekPhotoCal();
+                    showSync('✓ 照片已上傳');
+                }).catch(err => {
+                    showSync('⚠ 上傳失敗');
+                    console.error(err);
+                });
+            }, 'image/jpeg', 0.82);
         };
-        reader.readAsDataURL(file);
-    }
+        img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+}
 
     function openPhotoPreview(ds) {
         currentPreviewDate = ds;
@@ -1907,14 +1939,24 @@
         currentPreviewDate = null;
     }
 
-    function deletePhoto(ds) {
-        if(!ds || !confirm('刪除這張照片？')) return;
-        delete db.photos[ds];
-        save();
-        document.getElementById('photoPreviewOverlay').classList.add('hidden');
-        currentPreviewDate = null;
-        renderPhotoCalendar();
+function deletePhoto(ds) {
+    if (!ds || !confirm('刪除這張照片？')) return;
+
+    const photoVal = db.photos?.[ds];
+
+    // 如果是 Storage URL（非 base64），同步刪除 Storage 檔案
+    if (currentUser && photoVal && photoVal.startsWith('https://')) {
+        const path = `photos/${currentUser.uid}/${ds}.jpg`;
+        storage.ref(path).delete().catch(err => console.warn('Storage 刪除失敗', err));
     }
+
+    delete db.photos[ds];
+    save();
+    document.getElementById('photoPreviewOverlay').classList.add('hidden');
+    currentPreviewDate = null;
+    renderPhotoCalendar();
+    renderWeekPhotoCal();
+}
 
     // ═══════════════ 購物記帳 ═══════════════
     const shopCats = ['全部', '3C', '衣物', '鞋包', '表演', '好市多', '其他'];
