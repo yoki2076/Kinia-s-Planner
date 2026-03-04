@@ -1,0 +1,2852 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kinia's Planner v2</title>
+
+    <link rel="apple-touch-icon" href="icon.png">
+    
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --header-black: #000000;
+            --card-dark: #1e1e1e;
+            --text-gray: #b0b0b0;
+            --accent-gray: #e0e0e0;
+            --accent-red: #ff453a;
+            --border: #333;
+            --input-bg: #2c2c2e;
+            --bm-card: #252525;
+        }
+
+        * {
+            font-family: "HanziPen TC-Bold", "HanziPen TC", "Apple LiGothic", "Microsoft JhengHei", sans-serif;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            background-color: var(--bg-dark);
+            color: white; 
+            overflow: hidden;
+        }
+
+        /* 容器與面板基礎設定 */
+        .container { 
+            display: flex; 
+            height: calc(100vh - 60px); 
+            width: 600vw; 
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+        .panel { 
+            width: 100vw; 
+            height: 100%; 
+            flex-shrink: 0; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+            border-right: 1px solid var(--border); 
+        }
+
+        .header { 
+            background-color: var(--header-black); 
+            display: flex; align-items: center; justify-content: space-between; 
+            padding: 10px 15px; border-bottom: 1px solid var(--border); height: 60px; 
+        }
+
+        .btn-sm { background: #252525; color: white; border: 1px solid #444; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; }
+
+        /* --- 時間軸區域排版優化 --- */
+        .journal-flow { flex: 1; overflow-y: auto; padding: 20px; }
+        .bubble-item { display: flex; gap: 12px; margin-bottom: 15px; align-items: center; }
+        
+        /* 統一時間輸入框樣式，隱藏時鐘圖示 */
+        .time-input { 
+            background: #252525; border: 1px solid rgba(176,176,176,0.3); color: var(--text-gray); 
+            border-radius: 8px; padding: 6px 8px; font-size: 0.85rem; outline: none; 
+            width: 72px; -webkit-appearance: none; appearance: none; text-align: center;
+        }
+        .time-input::-webkit-calendar-picker-indicator { 
+            display: none;
+        }
+        
+        .text-bubble { 
+            background: #2c2c2e; padding: 12px 16px; border-radius: 18px; 
+            flex: 1; display: flex; align-items: center; gap: 10px; position: relative; color: white; min-height: 44px;
+        }
+        .text-bubble div[contenteditable="true"] { flex: 1; outline: none; word-break: break-word; white-space: pre-wrap; cursor: text; line-height: 1.4; }
+        .jn-del-btn { background: none; border: none; color: #888; font-size: 1.1rem; cursor: pointer; padding: 0 5px; display: flex; align-items: center; }
+        .jn-edit-textarea { background: #1e1e1e; border: none; border-radius: 10px; padding: 8px 10px; color: white; font-size: 1rem; outline: none; font-family: inherit; resize: none; overflow: hidden; min-height: 38px; max-height: 160px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; flex: 1; }
+        .jn-btn-row { display: flex; gap: 6px; margin-top: 8px; }
+        .jn-save-btn { flex: 1; background: var(--accent-gray); color: #000; border: none; border-radius: 10px; padding: 8px; font-size: 0.85rem; font-weight: bold; cursor: pointer; }
+        .jn-cancel-btn { flex: 1; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: rgba(255,255,255,0.45); font-size: 0.85rem; padding: 8px; cursor: pointer; }
+        .jn-sw-tag-del { background: none; border: none; color: #555; font-size: 0.65rem; cursor: pointer; padding: 0 0 0 4px; line-height: 1; vertical-align: middle; }
+        .jn-sw-tag-del:hover { color: #f55; }
+        /* 碼錶 */
+        .jn-sw-wrap {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 3px; flex-shrink: 0;
+        }
+        .jn-sw-circle {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: #333; border: 2px solid #444;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: background 0.15s, border-color 0.15s;
+            flex-shrink: 0;
+        }
+        .jn-sw-circle:active { background: #444; }
+        .jn-sw-circle.running {
+            background: rgba(245,197,24,0.15);
+            border-color: #f5c518;
+            box-shadow: 0 0 8px rgba(245,197,24,0.25);
+        }
+        .jn-sw-circle svg { color: #888; transition: color 0.15s; }
+        .jn-sw-circle.running svg { color: #f5c518; }
+        .jn-sw-digits {
+            font-family: monospace; font-size: 0.72rem;
+            color: #555; letter-spacing: 0.5px; line-height: 1;
+        }
+        .jn-sw-circle.running ~ .jn-sw-digits { color: #f5c518; }
+        .jn-sw-tags { display:flex; flex-direction:column; align-items:center; gap:3px; margin-top:2px; }
+        .jn-sw-tag {
+            background: #2a2a2a; border: 1px solid #3a3a3a;
+            border-radius: 8px; padding: 2px 7px;
+            font-family: monospace; font-size: 0.68rem;
+            color: #888; white-space: nowrap; line-height: 1.4;
+        }
+
+        /* 輸入列佈局 */
+        .input-bar { 
+            padding: 12px; background: #000; border-top: 1px solid var(--border); 
+            display: flex; gap: 8px; align-items: center; 
+            position: relative; z-index: 10;
+        }
+        /* 底部輸入列時間欄位，隱藏時鐘圖示 */
+        #jnTimeInput::-webkit-calendar-picker-indicator {
+            display: none;
+        }
+
+        .input-bar input[type="text"], .input-bar textarea { 
+            flex: 1; background: #2c2c2e; border: none; border-radius: 20px; 
+            padding: 10px 18px; color: white; outline: none; font-family: inherit; font-size: 1rem;
+            resize: none; overflow: hidden; min-height: 42px; max-height: 120px; line-height: 1.4;
+        }
+        .add-circle { 
+            background: var(--accent-gray); color: black; width: 42px; height: 42px; 
+            border-radius: 50%; border: none; font-size: 1.6rem; cursor: pointer; 
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0; 
+        }
+
+        /* 書籤樣式 */
+        .bookmark-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 12px; background: #1a1a1a; border-bottom: 1px solid #333; scrollbar-width: none; }
+        .bookmark-item { background: var(--bm-card); border-radius: 10px; padding: 14px; margin-bottom: 12px; border: 1px solid #333; border-left: 4px solid var(--accent-gray); position: relative; transition: opacity 0.15s; }
+        .bookmark-item.dragging { opacity: 0.35; }
+        .bookmark-item.drag-over { border-top: 2px solid var(--accent-gray); margin-top: -2px; }
+        .bookmark-item-edit { background: var(--bm-card); border-radius: 10px; padding: 14px; margin-bottom: 12px; border: 1px solid #555; display: flex; flex-direction: column; gap: 10px; }
+        .bm-edit-textarea { background: #2c2c2e; border: none; border-radius: 10px; padding: 10px 13px; color: white; font-size: 1rem; outline: none; font-family: inherit; resize: none; overflow: hidden; min-height: 60px; max-height: 200px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+        .bm-btn-row { display: flex; gap: 8px; }
+        .bm-save-btn { flex: 1; background: var(--accent-gray); color: #000; border: none; border-radius: 10px; padding: 9px; font-size: 0.9rem; font-weight: bold; cursor: pointer; }
+        .bm-cancel-btn { flex: 1; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: rgba(255,255,255,0.45); font-size: 0.9rem; padding: 9px; cursor: pointer; }
+        .bm-drag-handle { color: #555; cursor: grab; font-size: 1rem; flex-shrink: 0; touch-action: none; user-select: none; position: absolute; left: -4px; top: 50%; transform: translateY(-50%); padding: 0 4px; display: none; }
+        .bookmark-item:hover .bm-drag-handle { display: block; }
+        .bm-text { font-size: 1rem; color: #eee; line-height: 1.6; margin-bottom: 8px; word-break: break-word; white-space: pre-wrap; }
+        .bm-date { font-size: 0.75rem; color: #666; text-align: right; display: block; }
+        .bm-del-btn { position: absolute; top: 8px; right: 8px; background: none; border: none; color: #555; cursor: pointer; }
+
+        /* 行事曆與週曆 */
+        .list-view { flex: 1; overflow-y: auto; scroll-behavior: smooth; background: var(--bg-dark); }
+        .day-row { display: flex; border-bottom: 1px solid var(--border); min-height: 80px; align-items: stretch; }
+        .day-row.selected { background: #1a1a1a; border-left: 4px solid var(--accent-gray); }
+        .day-num-box { width: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 1px solid var(--border); background: rgba(255,255,255,0.02); cursor: pointer; }
+        .day-num { font-size: 1.3rem; font-weight: bold; }
+        .day-weekday { font-size: 0.75rem; }
+        .day-content { flex: 1; padding: 15px; outline: none; white-space: pre-wrap; color: #efefef; line-height: 1.4; cursor: text; }
+        .is-weekend-text { color: var(--accent-red) !important; }
+
+        .week-grid { display: grid; grid-template-columns: 1fr; gap: 12px; padding: 15px; overflow-y: auto; flex: 1; }
+
+        /* 週曆上方照片月曆小格 */
+        .week-photo-cal {
+            flex-shrink: 0; padding: 6px 6px 4px; background: #0d0d0d;
+            border-bottom: 1px solid var(--border);
+        }
+        .week-photo-cal-weekdays {
+            display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; margin-bottom: 2px;
+        }
+        .week-photo-cal-wd {
+            text-align: center; font-size: 0.6rem; color: #555; padding: 2px 0;
+        }
+        .week-photo-cal-wd.wkend { color: var(--accent-red); }
+        .week-photo-cal-grid {
+            display: grid; grid-template-columns: repeat(7,1fr); gap: 2px;
+        }
+        .wpc-cell {
+            border-radius: 6px; overflow: hidden; position: relative;
+            background: #1a1a1a; border: 1px solid #252525;
+            cursor: pointer; aspect-ratio: 1;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .wpc-cell.empty { background: transparent; border-color: transparent; cursor: default; }
+        .wpc-cell.today { border: 1.5px solid var(--accent-gray); }
+        .wpc-cell.active-week { background: #252525; }
+        .wpc-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .wpc-cell-date {
+            position: absolute; bottom: 1px; right: 2px;
+            font-size: 0.55rem; font-weight: bold; color: rgba(255,255,255,0.85);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.9); line-height: 1;
+        }
+        .wpc-cell-date.wkend { color: rgba(255,100,100,0.9); }
+        .wpc-cell-add { font-size: 0.9rem; color: #2e2e2e; }
+        .week-card { background: var(--card-dark); border-radius: 12px; padding: 15px; border: 1px solid #333; }
+        .week-card.today { border: 2px solid var(--accent-gray); }
+        .week-day-title { font-weight: bold; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+        .week-day-content { font-size: 0.95rem; color: #efefef; min-height: 2.5em; outline: none; white-space: pre-wrap; background: var(--input-bg); border-radius: 8px; padding: 10px; border: 1px solid transparent; cursor: text; }
+
+        /* 抽屜導覽 */
+        .calendar-drawer { background: #1a1a1a; border-bottom: 1px solid var(--border); overflow: hidden; transition: max-height 0.3s ease; }
+        .calendar-drawer.expanded { max-height: 500px; padding-bottom: 15px; }
+        .calendar-drawer.collapsed { max-height: 140px; }
+        .mini-calendar { padding: 10px 5px; display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+        .cal-date { padding: 8px 0; border-radius: 6px; cursor: pointer; font-size: 0.9rem; width: 85%; margin: 0 auto; }
+        .cal-date.selected { background: var(--accent-gray); color: #000; font-weight: bold; }
+        .cal-date.is-weekend { color: var(--accent-red); }
+
+        /* 導覽列 */
+        .nav-bar { position: fixed; bottom: 0; width: 100vw; height: 60px; background: #000; border-top: 1px solid var(--border); display: flex; z-index: 1000; }
+        .nav-item { flex: 1; border: none; background: none; color: var(--text-gray); font-size: 0.9rem; cursor: pointer; }
+        .nav-item.active { color: white; font-weight: bold; }
+
+        /* 桌面端響應式 */
+        @media (min-width: 768px) {
+            .container { width: 100vw; height: 100vh; transform: none !important; position: static; }
+            .panel { width: 35%; height: calc(100vh - 60px); }
+            #journalPanel { width: 65%; display: flex !important; }
+            #weekPanel, #listPanel, #bookmarkPanel, #shopPanel, #astroPanel, #photoPanel { display: none; }
+            #weekPanel.active-left, #listPanel.active-left, #bookmarkPanel.active-left, #shopPanel.active-left, #astroPanel.active-left, #photoPanel.active-left { display: flex; }
+            .nav-bar { width: 35%; }
+            .nav-item:nth-child(6) { display: none; }
+        }
+
+        /* --- 搜尋 --- */
+        .search-overlay {
+            position: fixed; inset: 0; background: var(--bg-dark);
+            z-index: 500; display: flex; flex-direction: column;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .search-overlay.open { transform: translateY(0); }
+        .search-header {
+            display: flex; align-items: center; gap: 10px;
+            padding: 12px 15px; background: #000;
+            border-bottom: 1px solid var(--border); height: 60px; flex-shrink: 0;
+        }
+        .search-input {
+            flex: 1; background: #1e1e1e; border: 1px solid #444;
+            border-radius: 20px; padding: 10px 18px; color: white;
+            outline: none; font-size: 1rem; font-family: inherit;
+        }
+        .search-cancel { background: none; border: none; color: var(--accent-gray); font-size: 0.95rem; cursor: pointer; white-space: nowrap; padding: 0 4px; }
+        .search-results { flex: 1; overflow-y: auto; padding: 12px 15px; }
+        .search-empty { color: #555; text-align: center; margin-top: 60px; font-size: 0.95rem; }
+        .search-result-item {
+            background: #1e1e1e; border: 1px solid #fff;
+            border-radius: 12px; padding: 12px 15px; margin-bottom: 10px; cursor: pointer;
+            transition: background 0.15s;
+        }
+        .search-result-item:active { background: #2a2a2a; }
+        .search-result-source { font-size: 0.72rem; color: var(--accent-red); letter-spacing: 1px; margin-bottom: 5px; text-transform: uppercase; }
+        .search-result-text { color: #efefef; font-size: 0.95rem; line-height: 1.5; }
+        .search-result-text mark { background: #f5c518; color: #000; border-radius: 3px; padding: 0 2px; font-style: normal; }
+        .search-result-meta { color: #888; font-size: 0.75rem; margin-top: 5px; }
+        .icon-btn { background: none; border: none; color: var(--accent-gray); cursor: pointer; padding: 5px; display: flex; align-items: center; justify-content: center; border-radius: 6px; opacity: 0.8; }
+        .icon-btn:active { opacity: 1; background: #222; }
+
+
+
+        /* ── 照片月曆 ── */
+        .photo-cal-header { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; background:#0d0d0d; border-bottom:1px solid var(--border); flex-shrink:0; }
+        .photo-cal-title { font-size:0.95rem; font-weight:bold; color:var(--accent-gray); letter-spacing:1px; cursor:pointer; }
+        .photo-cal-btn { background:none; border:none; color:var(--text-gray); font-size:1.1rem; cursor:pointer; padding:4px 10px; border-radius:6px; }
+        .photo-cal-grid-wrap { flex:1; overflow-y:auto; padding:10px; }
+        .photo-cal-weekdays { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-bottom:4px; }
+        .photo-cal-wd { text-align:center; font-size:0.65rem; color:#555; padding:4px 0; }
+        .photo-cal-wd.weekend { color:var(--accent-red); }
+        .photo-cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+        .photo-cell {
+            aspect-ratio: 1; border-radius:8px; overflow:hidden; position:relative;
+            background:#1a1a1a; border:1px solid #2a2a2a; cursor:pointer;
+            display:flex; align-items:center; justify-content:center;
+        }
+        .photo-cell.empty { cursor:default; background:transparent; border-color:transparent; }
+        .photo-cell.today { border:2px solid var(--accent-gray); }
+        .photo-cell img { width:100%; height:100%; object-fit:cover; display:block; }
+        .photo-cell-date {
+            position:absolute; bottom:2px; right:4px;
+            font-size:0.6rem; font-weight:bold; color:rgba(255,255,255,0.9);
+            text-shadow:0 1px 2px rgba(0,0,0,0.8); line-height:1;
+        }
+        .photo-cell-date.weekend { color:rgba(255,100,100,0.95); }
+        .photo-cell-add { font-size:1.2rem; color:#333; }
+        .photo-cell.has-photo .photo-cell-add { display:none; }
+        /* 預覽 overlay */
+        .photo-preview-overlay {
+            position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:3000;
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            gap:16px;
+        }
+        .photo-preview-overlay.hidden { display:none; }
+        .photo-preview-img { max-width:90vw; max-height:70vh; border-radius:12px; object-fit:contain; }
+        .photo-preview-date { color:#aaa; font-size:0.85rem; }
+        .photo-preview-btns { display:flex; gap:12px; }
+        .photo-preview-del { background:rgba(255,60,60,0.2); border:1px solid rgba(255,60,60,0.4); color:#ff6060; border-radius:10px; padding:8px 20px; cursor:pointer; font-size:0.9rem; }
+        .photo-preview-close { background:rgba(255,255,255,0.1); border:1px solid #444; color:#aaa; border-radius:10px; padding:8px 20px; cursor:pointer; font-size:0.9rem; }
+        /* ── 購物月份導覽 ── */
+        .shop-month-bar { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; background:#0d0d0d; border-bottom:1px solid var(--border); flex-shrink:0; }
+        .shop-month-btn { background:none; border:none; color:var(--text-gray); font-size:1.1rem; cursor:pointer; padding:4px 10px; border-radius:6px; }
+        .shop-month-btn:active { background:#222; }
+        .shop-month-title { font-size:0.95rem; font-weight:bold; color:var(--accent-gray); letter-spacing:1px; }
+        .shop-month-total { font-size:0.8rem; color:#666; }
+        .shop-month-summary { display:flex; justify-content:space-between; align-items:center; padding:10px 16px 6px; flex-shrink:0; }
+        .shop-month-label { font-size:0.85rem; color:#777; }
+        .shop-month-amount { font-size:1rem; font-weight:bold; color:var(--accent-gray); }
+        /* ── 購物記帳 ── */
+        .shop-tabs { display:flex; gap:8px; padding:10px 14px; overflow-x:auto; background:#0a0a0a; border-bottom:1px solid var(--border); flex-shrink:0; scrollbar-width:none; }
+        .shop-tabs::-webkit-scrollbar { display:none; }
+        .shop-tab { background:#1e1e1e; color:var(--text-gray); border:1px solid var(--border); border-radius:20px; padding:5px 14px; font-size:0.82rem; cursor:pointer; white-space:nowrap; flex-shrink:0; }
+        .shop-tab.active { background:var(--accent-gray); color:#000; font-weight:bold; border-color:var(--accent-gray); }
+
+        .shop-grid { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:12px; }
+
+        /* 編輯卡片 */
+        .shop-card-edit { background:#1e1e1e; border:1px solid #444; border-radius:16px; padding:14px 15px; display:flex; flex-direction:column; gap:10px; }
+        .shop-card-header { display:flex; gap:8px; align-items:center; }
+        .shop-card-title { flex:1; background:#2c2c2e; border:none; border-radius:10px; padding:9px 13px; color:white; font-size:0.95rem; outline:none; font-family:inherit; }
+        .shop-currency-select { background:#2c2c2e; border:none; border-radius:10px; padding:9px 10px; color:var(--accent-gray); font-size:0.85rem; outline:none; cursor:pointer; font-family:inherit; }
+        .shop-currency-select option { background:#1e1e1e; }
+        .shop-date-input { background:#2c2c2e; border:none; border-radius:10px; padding:8px 10px; color:var(--text-gray); font-size:0.85rem; outline:none; font-family:inherit; width:100%; -webkit-appearance:none; }
+        .shop-date-input::-webkit-calendar-picker-indicator { filter:invert(70%); cursor:pointer; }
+        .shop-item-row { display:flex; gap:6px; align-items:center; transition: opacity 0.15s; }
+        .shop-item-row.dragging { opacity: 0.35; }
+        .shop-item-row.drag-over { border-top: 2px solid var(--accent-gray); margin-top: -2px; }
+        .shop-drag-handle { color: #555; cursor: grab; padding: 4px 3px; font-size: 1rem; flex-shrink: 0; touch-action: none; user-select: none; line-height:1; }
+        .shop-drag-handle:active { cursor: grabbing; color: #888; }
+        .shop-items-list { display:flex; flex-direction:column; gap:10px; }
+        .shop-item-name { flex:2; background:#2c2c2e; border:none; border-radius:10px; padding:8px 12px; color:white; font-size:0.9rem; outline:none; font-family:inherit; }
+        .shop-item-price { flex:1; background:#2c2c2e; border:none; border-radius:10px; padding:8px 10px; color:var(--accent-gray); font-size:0.9rem; outline:none; font-family:inherit; text-align:right; min-width:0; }
+        .shop-item-del { background:none; border:none; color:#555; font-size:1rem; cursor:pointer; padding:4px; flex-shrink:0; }
+        .shop-add-item-btn { background:none; border:1px dashed #444; border-radius:10px; color:#666; font-size:0.85rem; padding:7px; cursor:pointer; width:100%; text-align:center; }
+        .shop-add-item-btn:active { background:#252525; }
+        .shop-publish-btn { background:var(--accent-gray); color:#000; border:none; border-radius:10px; padding:10px; font-size:0.9rem; font-weight:bold; cursor:pointer; flex:1; }
+        .shop-cancel-btn { background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1); border-radius:10px; color:rgba(255,255,255,0.45); font-size:0.9rem; padding:10px; cursor:pointer; flex:1; }
+        .shop-btn-row { display:flex; gap:8px; }
+
+        /* 表演欄位 */
+        .perf-row { display:flex; gap:8px; }
+        .perf-field { flex:1; background:#2c2c2e; border:none; border-radius:10px; padding:8px 12px; color:white; font-size:0.88rem; outline:none; font-family:inherit; min-width:0; }
+        .perf-field::placeholder { color:#555; }
+        .perf-field[type="date"]::-webkit-calendar-picker-indicator,
+        .perf-field[type="time"]::-webkit-calendar-picker-indicator { filter:invert(70%); cursor:pointer; -webkit-appearance:none; }
+        .perf-price-input { background:#2c2c2e; border:none; border-radius:10px; padding:8px 12px; color:var(--accent-gray); font-size:0.9rem; outline:none; font-family:inherit; width:100%; text-align:right; }
+
+        /* 唯讀卡片（一般） */
+        .shop-card-view { background:#1e1e1e; border:1px solid #fff; border-radius:16px; padding:14px 15px; cursor:pointer; position:relative; }
+        .shop-card-view:active { background:#252525; }
+        .shop-badge { display:inline-block; font-size:0.7rem; color:var(--accent-red); letter-spacing:1px; text-transform:uppercase; margin-bottom:6px; }
+        .shop-card-meta { font-size:0.78rem; color:#666; margin-bottom:4px; }
+        .shop-card-titletext { font-size:1rem; font-weight:bold; color:var(--accent-gray); margin-bottom:10px; }
+        .shop-divider { border:none; border-top:1px solid #333; margin:8px 0; }
+        .shop-item-line { display:flex; justify-content:space-between; font-size:0.9rem; color:#ddd; padding:3px 0; }
+        .shop-item-line.total { border-top:1px solid #333; margin-top:4px; padding-top:8px; font-weight:bold; color:white; }
+        .shop-card-del { position:absolute; top:10px; right:12px; background:none; border:none; color:#555; font-size:0.9rem; cursor:pointer; padding:2px 6px; z-index:2; }
+
+        /* 票卡（表演唯讀） */
+        .ticket-card { border:1px solid #fff; border-radius:16px; overflow:visible; cursor:pointer; position:relative; }
+        .ticket-card:active { opacity:0.85; }
+        .ticket-top { background:linear-gradient(135deg,#1e1e2e 0%,#252535 100%); border-left:4px solid var(--accent-gray); border-radius:16px 16px 0 0; padding:16px 16px 14px; }
+        .ticket-program { font-size:1.15rem; font-weight:bold; color:var(--accent-gray); margin-bottom:5px; }
+        .ticket-meta { font-size:0.82rem; color:#999; margin-bottom:2px; }
+        .ticket-divider { border:none; border-top:2px dashed #333; margin:0; }
+        .ticket-bottom { background:#1a1a1a; border-radius:0 0 16px 16px; padding:12px 16px; display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; }
+        .ticket-field { display:flex; flex-direction:column; }
+        .ticket-label { font-size:0.68rem; color:#666; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:2px; }
+        .ticket-value { font-size:0.88rem; color:#ddd; }
+        .ticket-venue { grid-column:1 / -1; }
+        .ticket-price-row { grid-column:1 / -1; display:flex; justify-content:space-between; align-items:center; border-top:1px solid #333; padding-top:8px; margin-top:4px; }
+        .ticket-price-label { font-size:0.82rem; color:#888; }
+        .ticket-price-value { font-size:1rem; font-weight:bold; color:var(--accent-gray); }
+
+        /* 新增按鈕 */
+        .shop-add-card-btn { background:#1a1a1a; border:1px dashed #444; border-radius:16px; color:#666; font-size:1rem; padding:14px; cursor:pointer; text-align:center; width:100%; }
+        .shop-add-card-btn:active { background:#252525; }
+        /* ══════════ 星象版面 ══════════ */
+        .astro-panel-scroll { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
+
+        .astro-section {
+            border-radius:16px;
+            background:linear-gradient(135deg,#0d0d2b 0%,#1a0a2e 50%,#0a1628 100%);
+            border:1px solid rgba(150,100,255,0.22);
+            position:relative; overflow:hidden; flex-shrink:0;
+        }
+        .astro-section::before {
+            content:''; position:absolute; inset:0; pointer-events:none;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='150'%3E%3Ccircle cx='20' cy='20' r='1' fill='white' opacity='0.35'/%3E%3Ccircle cx='80' cy='10' r='0.7' fill='white' opacity='0.5'/%3E%3Ccircle cx='160' cy='35' r='1.1' fill='white' opacity='0.28'/%3E%3Ccircle cx='220' cy='12' r='0.6' fill='white' opacity='0.45'/%3E%3Ccircle cx='50' cy='55' r='0.8' fill='white' opacity='0.3'/%3E%3Ccircle cx='130' cy='20' r='0.9' fill='white' opacity='0.4'/%3E%3Ccircle cx='200' cy='60' r='0.7' fill='white' opacity='0.25'/%3E%3Ccircle cx='110' cy='45' r='0.5' fill='white' opacity='0.55'/%3E%3C/svg%3E") repeat;
+        }
+        .astro-section-inner { position:relative; }
+
+        /* 收合標頭 */
+        .astro-collapse-header {
+            display:flex; justify-content:space-between; align-items:center;
+            padding:14px 16px; cursor:pointer; user-select:none;
+        }
+        .astro-collapse-header:active { opacity:0.8; }
+        .astro-collapse-title { font-size:0.72rem; color:rgba(200,170,255,0.8); letter-spacing:2.5px; text-transform:uppercase; }
+        .astro-collapse-right { display:flex; align-items:center; gap:8px; }
+        .astro-collapse-arrow { color:rgba(200,170,255,0.5); font-size:0.65rem; transition:transform 0.25s; }
+        .astro-collapse-arrow.open { transform:rotate(180deg); }
+        .astro-collapse-body { padding:0 16px 16px; }
+        .astro-collapse-body.hidden { display:none; }
+
+        .astro-section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+        .astro-section-title { font-size:0.72rem; color:rgba(200,170,255,0.75); letter-spacing:2.5px; text-transform:uppercase; }
+        .astro-icon-btn { background:rgba(255,255,255,0.07); border:1px solid rgba(200,150,255,0.2); border-radius:8px; color:rgba(200,170,255,0.7); font-size:0.75rem; padding:4px 10px; cursor:pointer; white-space:nowrap; }
+        .astro-icon-btn:active { background:rgba(255,255,255,0.13); }
+
+        /* 運勢 */
+        .astro-fortune-period { font-size:0.82rem; color:rgba(180,150,255,0.65); margin-bottom:6px; }
+        .astro-fortune-text { font-size:0.95rem; color:#e8d5ff; line-height:1.6; white-space:pre-wrap; word-break:break-word; }
+        .astro-fortune-empty { font-size:0.88rem; color:rgba(200,170,255,0.3); }
+        .astro-fortune-textarea {
+            width:100%; background:rgba(255,255,255,0.07); border:1px solid rgba(200,150,255,0.25);
+            border-radius:10px; padding:10px 12px; color:#e8d5ff; font-size:0.9rem;
+            outline:none; font-family:inherit; resize:none; line-height:1.5; box-sizing:border-box;
+        }
+        .astro-fortune-textarea::placeholder { color:rgba(200,170,255,0.28); }
+        .astro-fortune-input {
+            width:100%; background:rgba(255,255,255,0.07); border:1px solid rgba(200,150,255,0.25);
+            border-radius:10px; padding:9px 12px; color:#e8d5ff; font-size:0.88rem;
+            outline:none; font-family:inherit; box-sizing:border-box; margin-bottom:8px;
+        }
+        .astro-date-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+        .astro-date-input {
+            flex:1; background:rgba(255,255,255,0.07); border:1px solid rgba(200,150,255,0.25);
+            border-radius:10px; padding:8px 10px; color:#e8d5ff; font-size:0.85rem;
+            outline:none; font-family:inherit; min-width:0; -webkit-appearance:none;
+        }
+        .astro-date-input::-webkit-calendar-picker-indicator { filter:invert(70%) sepia(30%) saturate(300%) hue-rotate(220deg); cursor:pointer; }
+        .astro-date-sep { color:rgba(200,170,255,0.45); font-size:0.8rem; flex-shrink:0; }
+        .astro-fortune-input::placeholder { color:rgba(200,170,255,0.28); }
+        .astro-save-btn { flex:1; background:linear-gradient(135deg,#6b3fa0,#3d1a6e); border:none; border-radius:10px; color:white; font-size:0.9rem; font-weight:bold; padding:10px; cursor:pointer; font-family:inherit; }
+        .astro-cancel-btn { flex:1; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1); border-radius:10px; color:rgba(255,255,255,0.45); font-size:0.88rem; padding:10px; cursor:pointer; font-family:inherit; }
+        .astro-btn-row { display:flex; gap:8px; margin-top:8px; }
+
+        /* 星盤 */
+        .astro-chart-tabs { display:flex; gap:6px; margin-bottom:12px; }
+        .astro-chart-tab { flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(200,150,255,0.15); border-radius:20px; color:rgba(200,170,255,0.55); font-size:0.8rem; padding:6px 0; cursor:pointer; text-align:center; }
+        .astro-chart-tab.active { background:rgba(130,70,220,0.35); border-color:rgba(180,130,255,0.5); color:#d4aaff; font-weight:bold; }
+        .astro-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+        .astro-table th { color:rgba(200,170,255,0.5); font-size:0.7rem; letter-spacing:1px; text-align:center; padding:4px 6px; border-bottom:1px solid rgba(200,150,255,0.1); font-weight:normal; }
+        .astro-table td { padding:8px 6px; border-bottom:1px solid rgba(255,255,255,0.05); color:#ddd; vertical-align:middle; text-align:center; }
+        .astro-table td:first-child { color:#c9a0ff; font-weight:bold; white-space:nowrap; }
+        .astro-table tr:last-child td { border-bottom:none; }
+        .astro-note-cell { font-size:0.8rem; color:rgba(200,180,255,0.55); text-align:center; }
+        .astro-chart-edit-row { display:flex; gap:6px; margin-bottom:8px; align-items:center; }
+        .astro-chart-input { flex:1; background:rgba(255,255,255,0.07); border:1px solid rgba(200,150,255,0.2); border-radius:8px; padding:7px 8px; color:#e8d5ff; font-size:0.82rem; outline:none; font-family:inherit; min-width:0; }
+        .astro-chart-input::placeholder { color:rgba(200,170,255,0.25); }
+        .astro-add-row-btn { width:100%; background:none; border:1px dashed rgba(200,150,255,0.25); border-radius:10px; color:rgba(200,170,255,0.4); font-size:0.85rem; padding:8px; cursor:pointer; margin-top:4px; }
+        .astro-del-btn { background:none; border:none; color:rgba(255,100,100,0.35); cursor:pointer; font-size:0.9rem; padding:0 2px; flex-shrink:0; }
+
+        /* 多星盤：新增按鈕 */
+        .astro-add-chart-btn { width:100%; background:none; border:1px dashed rgba(200,150,255,0.2); border-radius:14px; color:rgba(200,170,255,0.45); font-size:0.9rem; padding:12px; cursor:pointer; text-align:center; }
+        .astro-add-chart-btn:active { background:rgba(255,255,255,0.04); }
+        /* 星盤名稱輸入 */
+        .astro-chart-name-input { width:100%; background:rgba(255,255,255,0.07); border:1px solid rgba(200,150,255,0.25); border-radius:10px; padding:9px 12px; color:#e8d5ff; font-size:0.95rem; font-weight:bold; outline:none; font-family:inherit; box-sizing:border-box; margin-bottom:10px; }
+        .astro-chart-name-input::placeholder { color:rgba(200,170,255,0.25); }
+
+        /* 當前星象項目 collapse & drag */
+        .cur-astro-item {
+            margin-bottom:8px; border-radius:12px;
+            border:1px solid rgba(200,150,255,0.15);
+            background:rgba(255,255,255,0.03);
+            transition:background 0.15s;
+            position:relative;
+        }
+        .cur-astro-item.drag-over { border-top:2px solid rgba(200,150,255,0.6); margin-top:-2px; }
+        .cur-astro-item.dragging { opacity:0.35; }
+        .cur-item-header {
+            display:flex; align-items:center; gap:8px;
+            padding:11px 12px; cursor:pointer; user-select:none;
+        }
+        .cur-item-drag-handle {
+            color:rgba(200,150,255,0.35); cursor:grab; font-size:1rem;
+            flex-shrink:0; touch-action:none; user-select:none; line-height:1;
+            padding:2px 3px;
+        }
+        .cur-item-drag-handle:active { cursor:grabbing; color:rgba(200,150,255,0.7); }
+        .cur-item-title-wrap { flex:1; min-width:0; }
+        .cur-item-title { font-size:0.88rem; font-weight:bold; color:#d4aaff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .cur-item-period { font-size:0.72rem; color:rgba(180,150,255,0.55); margin-top:2px; }
+        .cur-item-arrow { color:rgba(200,170,255,0.45); font-size:0.6rem; transition:transform 0.22s; flex-shrink:0; }
+        .cur-item-arrow.open { transform:rotate(180deg); }
+        .cur-item-body { padding:0 12px 12px 36px; }
+        .cur-item-body.hidden { display:none; }
+        .cur-item-preview { font-size:0.75rem; color:rgba(200,170,255,0.4); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+        .cur-item-text { font-size:0.88rem; color:#e8d5ff; line-height:1.6; white-space:pre-wrap; word-break:break-word; }
+        .cur-item-actions { display:flex; gap:8px; margin-top:10px; }
+
+        /* 星座 chips */
+        .astro-signs-row { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+        .astro-sign-chip { background:rgba(255,255,255,0.07); border:1px solid rgba(200,150,255,0.2); border-radius:20px; padding:4px 11px; font-size:0.75rem; color:rgba(220,200,255,0.7); cursor:pointer; white-space:nowrap; }
+        .astro-sign-chip.has-note { border-color:rgba(200,150,255,0.55); color:#d4aaff; background:rgba(150,80,255,0.18); }
+        .astro-sign-chip:active { opacity:0.7; }
+        .astro-signs-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .astro-sign-block label { font-size:0.7rem; color:rgba(200,170,255,0.55); display:block; margin-bottom:3px; }
+
+        /* ── Firebase 登入畫面 ── */
+        #authScreen {
+            position: fixed; inset: 0; background: var(--bg-dark);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            z-index: 9999; gap: 24px;
+        }
+        #authScreen.hidden { display: none; }
+        .auth-logo { font-size: 2rem; font-weight: bold; color: var(--accent-gray); letter-spacing: 2px; }
+        .auth-sub { color: var(--text-gray); font-size: 0.9rem; }
+        .auth-google-btn {
+            display: flex; align-items: center; gap: 12px;
+            background: white; color: #333; border: none;
+            border-radius: 12px; padding: 13px 24px;
+            font-size: 1rem; font-weight: bold; cursor: pointer;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+        }
+        .auth-google-btn:active { opacity: 0.85; }
+        .auth-skip-btn {
+            background: none; border: 1px solid #444; color: #666;
+            border-radius: 12px; padding: 11px 28px;
+            font-size: 0.9rem; cursor: pointer; font-family: inherit;
+        }
+        .auth-skip-btn:active { background: #1a1a1a; }
+        .auth-status {
+            flex: 1; display: flex; flex-direction: column; align-items: center;
+            justify-content: center; gap: 2px;
+            border-left: 1px solid #222;
+            padding: 4px 2px;
+        }
+        .auth-status.hidden { display: none; }
+        .auth-user-name { font-size: 0.65rem; color: #aaa; max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .auth-user-dot { width: 5px; height: 5px; border-radius: 50%; background: #4caf50; display: inline-block; margin-right: 3px; flex-shrink: 0; }
+        .auth-signout-btn { background: none; border: none; color: #555; font-size: 0.6rem; cursor: pointer; text-decoration: underline; padding: 0; line-height: 1; }
+        .sync-indicator {
+            position: fixed; bottom: 68px; right: 14px;
+            background: #1e1e1e; border: 1px solid #333;
+            border-radius: 20px; padding: 5px 12px;
+            font-size: 0.75rem; color: var(--text-gray);
+            z-index: 100; opacity: 0;
+            transition: opacity 0.4s;
+            pointer-events: none;
+        }
+        .sync-indicator.show { opacity: 1; }
+    </style>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+
+<!-- 登入畫面 -->
+<div id="authScreen">
+    <div class="auth-logo">Kinia's Planner</div>
+    <div class="auth-sub">登入以同步你的資料</div>
+    <button class="auth-google-btn" onclick="signInWithGoogle()">
+        <svg width="20" height="20" viewBox="0 0 48 48">
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.36-8.16 2.36-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+        使用 Google 帳號登入
+    </button>
+    <button class="auth-skip-btn" onclick="skipLogin()">暫時離線使用</button>
+</div>
+
+<!-- 登入狀態列 -->
+
+<!-- 同步提示 -->
+<div class="sync-indicator" id="syncIndicator">☁ 已同步</div>
+
+<div class="container" id="mainContainer">
+    <div class="panel" id="weekPanel">
+        <div class="header">
+            <button class="btn-sm" onclick="changeWeek(-1)">◀ 上一週</button>
+            <div id="weekTitle" onclick="goToday()" style="font-weight:bold; cursor:pointer; flex:1; text-align:center;">WEEK</div>
+            <div style="display:flex; gap:6px; align-items:center;">
+                <button class="icon-btn" onclick="openSearch()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+                <button class="btn-sm" onclick="changeWeek(1)">下一週 ▶</button>
+            </div>
+        </div>
+        <div class="week-photo-cal">
+            <div class="week-photo-cal-weekdays">
+                <div class="week-photo-cal-wd wkend">日</div>
+                <div class="week-photo-cal-wd">一</div>
+                <div class="week-photo-cal-wd">二</div>
+                <div class="week-photo-cal-wd">三</div>
+                <div class="week-photo-cal-wd">四</div>
+                <div class="week-photo-cal-wd">五</div>
+                <div class="week-photo-cal-wd wkend">六</div>
+            </div>
+            <div class="week-photo-cal-grid" id="weekPhotoCalGrid"></div>
+        </div>
+        <div class="week-grid" id="weekGrid"></div>
+    </div>
+
+    <div class="panel" id="listPanel">
+        <div class="header">
+            <button class="btn-sm" onclick="changeMonth(-1)">◀</button>
+            <div id="monthTitle" style="font-weight:bold; cursor:pointer; flex:1; text-align:center;" onclick="goToday()">MONTH</div>
+            <div style="display:flex; gap:6px; align-items:center;">
+                <button class="icon-btn" onclick="openSearch()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+                <button class="btn-sm" onclick="changeMonth(1)">▶</button>
+            </div>
+        </div>
+        <div class="list-view" id="calendarList"></div>
+    </div>
+
+    <div class="panel" id="bookmarkPanel">
+        <div class="header">
+            <span style="font-weight:bold; flex:1;">書籤收藏</span>
+            <div style="display:flex; gap:6px; align-items:center;">
+                <button class="icon-btn" onclick="openSearch()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+                <button class="icon-btn" id="manageBtn" onclick="toggleBookmarkManage()" title="管理分類"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+            </div>
+        </div>
+        <div id="bookmarkNormalUI" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
+            <div class="bookmark-tabs" id="bookmarkTabs"></div>
+            <div class="journal-flow" id="bookmarkContent" style="padding:15px;"></div>
+            <div class="input-bar">
+                <textarea id="bmInput" placeholder="新增書籤內容..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addBookmarkContent();}" oninput="autoResize(this)"></textarea>
+                <button class="add-circle" onclick="addBookmarkContent()">+</button>
+            </div>
+        </div>
+        <div id="bookmarkManageUI" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+            <div style="padding:15px 20px 10px; background:#111; border-bottom:1px solid #333; display:flex; gap:8px;">
+                <input type="text" id="newCatInput" placeholder="新增分類名稱..." onkeypress="if(event.key==='Enter') addCat()" style="flex:1; background:#2c2c2e; border:none; border-radius:20px; padding:10px 18px; color:white; outline:none; font-size:0.9rem;">
+                <button class="add-circle" onclick="addCat()" style="width:38px;height:38px;font-size:1.4rem;">+</button>
+            </div>
+            <div id="categoryManageList" style="flex:1; overflow-y:auto; padding:15px;"></div>
+        </div>
+    </div>
+
+
+    <div class="panel" id="shopPanel">
+        <div class="header">
+            <span style="font-weight:bold;flex:1;">購物記帳</span>
+            <button class="icon-btn" onclick="openSearch()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </button>
+        </div>
+        <div class="shop-month-bar">
+            <button class="shop-month-btn" onclick="changeShopMonth(-1)">◀</button>
+            <div style="text-align:center;">
+                <div class="shop-month-title" id="shopMonthTitle" onclick="shopViewMonth=new Date();renderShopTabs();renderShop();" style="cursor:pointer;" title="點擊回到本月">—</div>
+            </div>
+            <button class="shop-month-btn" onclick="changeShopMonth(1)">▶</button>
+        </div>
+        <div class="shop-month-summary" id="shopMonthSummary" style="display:none;">
+            <span class="shop-month-label">本月合計</span>
+            <span class="shop-month-amount" id="shopMonthAmount"></span>
+        </div>
+        <div class="shop-tabs" id="shopTabs"></div>
+        <div class="shop-grid" id="shopGrid"></div>
+    </div>
+
+    <!-- ══════════ 星象版面 ══════════ -->
+    <div class="panel" id="astroPanel">
+        <div class="header">
+            <span style="font-weight:bold;flex:1;">✦ 星象</span>
+        </div>
+        <div class="astro-panel-scroll" id="astroPanelScroll"></div>
+    </div>
+
+
+    <div class="panel" id="journalPanel">
+        <div class="header">
+            <div onclick="toggleCalendar()" style="cursor:pointer; flex:1;">
+                <span id="activeDateDisplay" style="font-weight:bold;">日期</span> 
+                <span id="drawerArrow"> ▼</span>
+            </div>
+            <div style="display:flex; gap:6px; align-items:center;">
+                <button class="btn-sm" onclick="goToday()">今天</button>
+                <button class="icon-btn" onclick="openSearch()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+                <button class="icon-btn" onclick="exportData()" title="匯出"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><polyline points="8 12 12 8 16 12"/><line x1="12" y1="8" x2="12" y2="17"/></svg></button>
+                <button class="icon-btn" onclick="triggerImport()" title="匯入"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><polyline points="8 12 12 16 16 12"/><line x1="12" y1="16" x2="12" y2="7"/></svg></button>
+                <input type="file" id="importFile" style="display:none" onchange="importJSON(event)">
+            </div>
+        </div>
+        <div class="calendar-drawer collapsed" id="calDrawer">
+            <div class="mini-cal-nav" style="display:flex; justify-content:space-between; padding:10px 15px;">
+                <button class="btn-sm" onclick="changeDrawerMonth(-1)">◀</button>
+                <div id="miniMonthTitle" style="font-weight:bold; cursor:pointer;" onclick="goToday()">MONTH</div>
+                <button class="btn-sm" onclick="changeDrawerMonth(1)">▶</button>
+            </div>
+            <div class="mini-calendar" id="miniCalGrid"></div>
+        </div>
+        <div class="journal-flow" id="journalFlow"></div>
+        <div class="input-bar">
+            <input type="time" id="jnTimeInput" style="background:#2c2c2e; border:1px solid #444; color:white; border-radius:12px; padding:8px; width:72px; outline:none; -webkit-appearance:none; appearance:none; text-align:center;">
+            <textarea id="jnInput" placeholder="記錄此時此刻..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addJournal();}" oninput="autoResize(this)"></textarea>
+            <button class="add-circle" onclick="addJournal()">+</button>
+        </div>
+    </div>
+
+    <!-- ══════════ 照片月曆 ══════════ -->
+    <div class="panel" id="photoPanel">
+        <div class="photo-cal-header">
+            <button class="photo-cal-btn" onclick="changePhotoMonth(-1)">◀</button>
+            <div class="photo-cal-title" id="photoMonthTitle" onclick="photoViewMonth=new Date();renderPhotoCalendar();" title="點擊回到本月">—</div>
+            <button class="photo-cal-btn" onclick="changePhotoMonth(1)">▶</button>
+        </div>
+        <div class="photo-cal-grid-wrap">
+            <div class="photo-cal-weekdays">
+                <div class="photo-cal-wd weekend">日</div>
+                <div class="photo-cal-wd">一</div>
+                <div class="photo-cal-wd">二</div>
+                <div class="photo-cal-wd">三</div>
+                <div class="photo-cal-wd">四</div>
+                <div class="photo-cal-wd">五</div>
+                <div class="photo-cal-wd weekend">六</div>
+            </div>
+            <div class="photo-cal-grid" id="photoCalGrid"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 照片預覽 overlay -->
+<div class="photo-preview-overlay hidden" id="photoPreviewOverlay" onclick="closePhotoPreview(event)">
+    <img class="photo-preview-img" id="photoPreviewImg" src="" alt="">
+    <div class="photo-preview-date" id="photoPreviewDate"></div>
+    <div class="photo-preview-btns">
+        <button class="photo-preview-del" onclick="deletePhoto(currentPreviewDate)">🗑 刪除</button>
+        <button class="photo-preview-close" onclick="closePhotoPreview()">關閉</button>
+    </div>
+</div>
+<input type="file" accept="image/*" id="photoFileInput" style="display:none" onchange="handlePhotoUpload(event)">
+
+<div class="nav-bar">
+    <button class="nav-item active" onclick="switchPanel(0)">週曆</button>
+    <button class="nav-item" onclick="switchPanel(1)">行事曆</button>
+    <button class="nav-item" onclick="switchPanel(2)">書籤</button>
+    <button class="nav-item" onclick="switchPanel(3)">購物</button>
+    <button class="nav-item" onclick="switchPanel(4)">星象</button>
+    <button class="nav-item" onclick="switchPanel(5)">時間軸</button>
+    <div class="auth-status hidden" id="authStatus">
+        <div style="display:flex;align-items:center;gap:2px;">
+            <span class="auth-user-dot"></span>
+            <span class="auth-user-name" id="authUserName"></span>
+        </div>
+        <button class="auth-signout-btn" onclick="signOut()">登出</button>
+    </div>
+</div>
+
+<script>
+    // ══════════════════════════════════════════
+    // Firebase 設定
+    // ══════════════════════════════════════════
+    const firebaseConfig = {
+        apiKey:            "AIzaSyAncFCJPCWOLJ_-JupDwxebRF_uIcPnVLM",
+        authDomain:        "kinia-s-columns.firebaseapp.com",
+        projectId:         "kinia-s-columns",
+        storageBucket:     "kinia-s-columns.firebasestorage.app",
+        messagingSenderId: "290808271526",
+        appId:             "1:290808271526:web:66b856d0bc6eec25199a67",
+        measurementId:     "G-JQ6DGBKHN2"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth      = firebase.auth();
+    const firestore = firebase.firestore();
+    let currentUser    = null;
+    let firestoreDocRef = null;
+    let saveTimeout    = null;
+    let localWriteAt   = 0; // 最後一次本地寫入 Firestore 的時間戳
+
+    // db：優先從 localStorage 讀（離線 cache）
+    let db = JSON.parse(localStorage.getItem('mega_v14_final_fix')) || {
+        calendar: {}, journals: {}, bookmarks: { "我的筆記": [] }, catOrder: ["我的筆記"], shop: []
+    };
+    if(!db.shop)  db.shop  = [];
+    if(!db.astro) db.astro = {};
+
+    // save()：寫 localStorage + 防抖 800ms 寫 Firestore
+    function save() {
+        localStorage.setItem('mega_v14_final_fix', JSON.stringify(db));
+        if(!firestoreDocRef) return;
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => {
+            localWriteAt = Date.now();
+            firestoreDocRef.set({ data: JSON.stringify(db) })
+                .then(()  => showSync('☁ 已同步'))
+                .catch(() => showSync('⚠ 同步失敗'));
+        }, 800);
+    }
+
+    function showSync(msg) {
+        const el = document.getElementById('syncIndicator');
+        if(!el) return;
+        el.textContent = msg;
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 2500);
+    }
+
+    // Google 登入
+    function signInWithGoogle() {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithPopup(provider).catch(err => alert('登入失敗：' + err.message));
+    }
+    function skipLogin() {
+        document.getElementById('authScreen').classList.add('hidden');
+        initApp();
+    }
+    function signOut() {
+        if(!confirm('確定登出？')) return;
+        auth.signOut();
+    }
+
+    // Auth 狀態監聽：登入後拉雲端資料
+    auth.onAuthStateChanged(user => {
+        currentUser = user;
+        if(user) {
+            firestoreDocRef = firestore.collection('planners').doc(user.uid);
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('authStatus').classList.remove('hidden');
+            // body.logged-in no longer needed (auth badge is floating)
+            document.getElementById('authUserName').textContent = user.displayName || user.email;
+
+            // ── 合併函式：把本地與雲端資料整合，不丟失任何一方的內容 ──
+            function mergeDb(local, cloud) {
+                const merged = JSON.parse(JSON.stringify(cloud)); // 以雲端為底
+
+                // 1. journals：逐日合併，同一天的條目以時間+內容去重
+                Object.entries(local.journals || {}).forEach(([date, entries]) => {
+                    if(!merged.journals[date]) {
+                        merged.journals[date] = entries;
+                    } else {
+                        const existing = new Set(
+                            merged.journals[date].map(j => j.time + '|' + j.text)
+                        );
+                        entries.forEach(j => {
+                            if(!existing.has(j.time + '|' + j.text)) {
+                                merged.journals[date].push(j);
+                            }
+                        });
+                        merged.journals[date].sort((a,b) => a.time.localeCompare(b.time));
+                    }
+                });
+
+                // 2. calendar：本地有值且雲端沒有的日期，保留本地
+                Object.entries(local.calendar || {}).forEach(([date, text]) => {
+                    if(text && !merged.calendar[date]) {
+                        merged.calendar[date] = text;
+                    }
+                });
+
+                // 3. bookmarks：逐分類合併，以內容去重
+                (local.catOrder || []).forEach(cat => {
+                    if(!merged.catOrder.includes(cat)) {
+                        merged.catOrder.push(cat);
+                        merged.bookmarks[cat] = local.bookmarks[cat] || [];
+                    } else {
+                        const existing = new Set(
+                            (merged.bookmarks[cat] || []).map(b => b.text)
+                        );
+                        (local.bookmarks[cat] || []).forEach(b => {
+                            if(!existing.has(b.text)) {
+                                merged.bookmarks[cat].push(b);
+                            }
+                        });
+                    }
+                });
+
+                // 4. shop：以 id 去重，本地有但雲端沒有的補上
+                const cloudShopIds = new Set((merged.shop || []).map(c => c.id));
+                (local.shop || []).forEach(card => {
+                    if(!cloudShopIds.has(card.id)) {
+                        merged.shop.push(card);
+                    }
+                });
+
+                // 5. astro：雲端為主，但本地若有雲端沒有的 chart 補上
+                if(local.astro?.charts) {
+                    const cloudChartIds = new Set((merged.astro?.charts || []).map(c => c.id));
+                    (local.astro.charts || []).forEach(chart => {
+                        if(!cloudChartIds.has(chart.id)) {
+                            merged.astro.charts.push(chart);
+                        }
+                    });
+                }
+
+                return merged;
+            }
+
+            // onSnapshot：即時監聽
+            let appInited = false;
+            firestoreDocRef.onSnapshot(snap => {
+                if(snap.exists && snap.data().data) {
+                    const cloudDb = JSON.parse(snap.data().data);
+                    if(!appInited) {
+                        // 首次登入：合併離線資料與雲端資料
+                        db = mergeDb(db, cloudDb);
+                        if(!db.shop)  db.shop  = [];
+                        if(!db.astro) db.astro = {};
+                        localStorage.setItem('mega_v14_final_fix', JSON.stringify(db));
+                        // 把合併結果存回雲端
+                        firestoreDocRef.set({ data: JSON.stringify(db) });
+                    } else {
+                        // 已初始化後的更新（其他裝置觸發）
+                        // 若距離上次本地寫入不足 4 秒，忽略（這是自己發出的回音）
+                        if(Date.now() - localWriteAt < 4000) {
+                            showSync('☁ 已同步');
+                            return;
+                        }
+                        db = cloudDb;
+                        if(!db.shop)  db.shop  = [];
+                        if(!db.astro) db.astro = {};
+                        localStorage.setItem('mega_v14_final_fix', JSON.stringify(db));
+                        renderWeek(); renderList(); renderJournals();
+                        renderShopTabs(); renderShop();
+                        showSync('☁ 已從雲端同步');
+                    }
+                }
+                if(!appInited) { appInited = true; initApp(); }
+            }, () => { if(!appInited) { appInited = true; initApp(); } });
+        } else {
+            firestoreDocRef = null;
+            // 若已跳過登入（authScreen 已是 hidden），不要再顯示
+            const authScreen = document.getElementById('authScreen');
+            if(!authScreen.classList.contains('hidden')) {
+                authScreen.classList.remove('hidden');
+            }
+            document.getElementById('authStatus').classList.add('hidden');
+            // body.logged-in no longer needed
+        }
+    });
+    function getDS(d = new Date()) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+
+    let activeDS = getDS(), viewMonth = new Date(), drawerMonth = new Date();
+    let isCalExpanded = false, currentCat = db.catOrder[0] || "我的筆記", isManaging = false;
+    const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+    const weekDaysShort = ['日', '一', '二', '三', '四', '五', '六'];
+
+    function switchPanel(idx) {
+        if (window.innerWidth < 768) {
+            document.getElementById('mainContainer').style.transform = `translateX(-${idx * 100}vw)`;
+        } else {
+            ['weekPanel', 'listPanel', 'bookmarkPanel', 'shopPanel', 'astroPanel', 'photoPanel'].forEach((id, i) => {
+                const el = document.getElementById(id);
+                if(el) el.classList.toggle('active-left', i === idx);
+            });
+            if(idx === 5) switchPanel(0);
+        }
+        document.querySelectorAll('.nav-item').forEach((b, i) => b.classList.toggle('active', i === idx));
+        if(idx === 0) renderWeek();
+        if(idx === 1) renderList();
+        if(idx === 2) renderBookmarkUI();
+        if(idx === 3) { renderShopTabs(); renderShop(); }
+        if(idx === 4) renderAstroPanel();
+        if(idx === 5) renderJournals();
+    }
+
+    let jnEditState = {}; // { 'date_i': true }
+
+    function renderJournals() {
+        const flow = document.getElementById('journalFlow'); if(!flow) return;
+        const items = db.journals[activeDS] || [];
+        flow.innerHTML = '';
+        items.sort((a,b) => a.time.localeCompare(b.time)).forEach((j, i) => {
+            const swState = swStates[activeDS + '_' + i];
+            const isRunning = swState && swState.running;
+            const elapsed = swState ? swState.elapsed : 0;
+            // 標籤從 db 讀取（可持久化＆雲端同步）
+            const hasTags = !isRunning && j.swDuration;
+            const tagsHtml = hasTags ? `
+                <div class="jn-sw-tags">
+                    <span class="jn-sw-tag">⏱ ${j.swDuration}</span>
+                    <span class="jn-sw-tag">${j.swStartTime} → ${j.swEndTime}</span>
+                </div>` : '';
+            const isEditing = !!jnEditState[activeDS + '_' + i];
+            const swCircle = `<div class="jn-sw-circle ${isRunning?'running':''}" id="swCap_${i}" onclick="toggleStopwatch(${i})">
+                ${isRunning
+                    ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="8" y1="5" x2="8" y2="19"/><line x1="16" y1="5" x2="16" y2="19"/></svg>'
+                    : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="13" x2="15" y2="15"/><line x1="9" y1="2" x2="15" y2="2"/><line x1="12" y1="2" x2="12" y2="5"/></svg>'}
+            </div>`;
+            const tagsHtmlFull = hasTags ? `
+                <div class="jn-sw-tags">
+                    <span class="jn-sw-tag">⏱ ${j.swDuration}<button class="jn-sw-tag-del" onclick="clearSwTag(${i})">✕</button></span>
+                    <span class="jn-sw-tag">${j.swStartTime} → ${j.swEndTime}</span>
+                </div>` : '';
+            if(isEditing) {
+                flow.innerHTML += `
+                <div class="bubble-item" style="align-items:flex-start;">
+                    <input type="time" class="time-input" id="jnTimeEdit_${i}" value="${j.time}">
+                    <div class="text-bubble" style="flex-direction:column;align-items:stretch;gap:0;">
+                        <textarea class="jn-edit-textarea" id="jnTextEdit_${i}">${j.text.replace(/</g,'&lt;')}</textarea>
+                        <div class="jn-btn-row">
+                            <button class="jn-cancel-btn" onclick="jnEditState['${activeDS}_${i}']=false;renderJournals()">取消</button>
+                            <button class="jn-save-btn" onclick="saveJnEdit(${i})">儲存</button>
+                        </div>
+                    </div>
+                </div>`;
+                setTimeout(() => { const ta = document.getElementById(`jnTextEdit_${i}`); if(ta){ autoResize(ta); ta.oninput = ()=>autoResize(ta); ta.focus(); } }, 0);
+            } else {
+                flow.innerHTML += `
+                <div class="bubble-item">
+                    <input type="time" class="time-input" value="${j.time}" onchange="updateJTime(${i}, this.value)">
+                    <div class="text-bubble">
+                        <div style="flex:1;word-break:break-word;white-space:pre-wrap;line-height:1.4;cursor:default;" ondblclick="jnEditState['${activeDS}_${i}']=true;renderJournals()">${j.text.replace(/</g,'&lt;')}</div>
+                        <div class="jn-sw-wrap">
+                            <div style="display:flex;align-items:center;gap:4px;">
+                                ${swCircle}
+                                ${hasTags ? `<button class="jn-del-btn" onclick="delJournal(${i})">✕</button>` : ''}
+                            </div>
+                            <span class="jn-sw-digits" id="swDisp_${i}">${elapsed ? fmtSw(elapsed) : ''}</span>
+                            ${tagsHtmlFull}
+                        </div>
+                        ${!hasTags ? `<button class="jn-del-btn" onclick="delJournal(${i})">✕</button>` : ''}
+                    </div>
+                </div>`;
+            };
+        });
+        flow.scrollTop = flow.scrollHeight;
+        updateInputTime();
+    }
+
+
+    // ── 碼錶 ──────────────────────────────────────────────────
+    // swStates: { 'YYYY-MM-DD_i': { running, startAt, elapsed, interval } }
+    const swStates = {};
+
+    function fmtSw(ms) {
+        if(!ms) return '00:00';
+        const s = Math.floor(ms / 1000);
+        const m = Math.floor(s / 60);
+        const h = Math.floor(m / 60);
+        if(h > 0) return `${String(h).padStart(2,'0')}:${String(m%60).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+        return `${String(m).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+    }
+
+    function toggleStopwatch(idx) {
+        const key = activeDS + '_' + idx;
+        if(!swStates[key]) swStates[key] = { running: false, startAt: 0, elapsed: 0, interval: null, startTime: '' };
+        const sw = swStates[key];
+
+        if(!sw.running) {
+            // 開始計時：記錄開始的時鐘時間
+            sw.running = true;
+            sw.startAt = Date.now() - sw.elapsed;
+            sw.startTime = new Date().toTimeString().slice(0, 5);
+            sw.interval = setInterval(() => {
+                sw.elapsed = Date.now() - sw.startAt;
+                const disp = document.getElementById(`swDisp_${idx}`);
+                if(disp) disp.textContent = fmtSw(sw.elapsed);
+            }, 500);
+            // 更新圓形按鈕樣式
+            const cap = document.getElementById(`swCap_${idx}`);
+            if(cap) {
+                cap.classList.add('running');
+                cap.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="8" y1="5" x2="8" y2="19"/><line x1="16" y1="5" x2="16" y2="19"/></svg>';
+            }
+        } else {
+            // 停止 → 把標籤存進 db.journals 的該筆資料
+            clearInterval(sw.interval);
+            sw.running = false;
+            const endTime   = new Date().toTimeString().slice(0, 5);
+            const startTime = sw.startTime || endTime;
+            const duration  = fmtSw(sw.elapsed);
+            sw.elapsed   = 0;
+            sw.startTime = '';
+
+            // 寫入 db，讓標籤持久化並同步雲端
+            const items = db.journals[activeDS];
+            if(items && items[idx]) {
+                items[idx].swDuration  = duration;
+                items[idx].swStartTime = startTime;
+                items[idx].swEndTime   = endTime;
+                save();
+            }
+            renderJournals();
+        }
+    }
+
+    function updateInputTime() {
+        const now = new Date();
+        const el = document.getElementById('jnTimeInput');
+        if(el) el.value = now.toTimeString().slice(0,5);
+    }
+
+    function addJournal() {
+        const input = document.getElementById('jnInput');
+        const timeInput = document.getElementById('jnTimeInput');
+        if(!input.value.trim()) return;
+        if(!db.journals[activeDS]) db.journals[activeDS] = [];
+        db.journals[activeDS].push({ time: timeInput.value || new Date().toTimeString().slice(0,5), text: input.value });
+        input.value = ''; input.style.height = '42px'; save(); renderJournals(); updateInputTime();
+    }
+
+    // --- 日期與導覽 ---
+    function selectDate(ds, autoSwitch = true) {
+        activeDS = ds; const d = new Date(ds);
+        document.getElementById('activeDateDisplay').innerText = `${d.getMonth()+1}月${d.getDate()}日 週${weekDaysShort[d.getDay()]}`;
+        renderWeek(); renderMiniCal(); renderList(); renderJournals();
+        if(autoSwitch && window.innerWidth < 768) switchPanel(5);
+    }
+    function updateCal(date, text) { db.calendar[date] = text; save(); document.querySelectorAll(`.sync-${date}`).forEach(el => el.innerText = text); }
+    function changeWeek(dir) { const d = new Date(activeDS); d.setDate(d.getDate() + dir*7); selectDate(getDS(d), false); }
+    function changeMonth(dir) { viewMonth.setMonth(viewMonth.getMonth() + dir); renderList(); }
+    function changeDrawerMonth(dir) { drawerMonth.setMonth(drawerMonth.getMonth() + dir); renderMiniCal(); }
+    function updateJTime(i, v) { db.journals[activeDS][i].time = v; save(); renderJournals(); }
+    function updateJText(i, v) { db.journals[activeDS][i].text = v; save(); }
+    function saveJnEdit(i) {
+        const t = document.getElementById(`jnTimeEdit_${i}`)?.value;
+        const txt = document.getElementById(`jnTextEdit_${i}`)?.value || '';
+        if(db.journals[activeDS] && db.journals[activeDS][i]) {
+            if(t) db.journals[activeDS][i].time = t;
+            db.journals[activeDS][i].text = txt;
+        }
+        delete jnEditState[activeDS + '_' + i];
+        save(); renderJournals();
+    }
+    function clearSwTag(i) {
+        const items = db.journals[activeDS];
+        if(items && items[i]) {
+            delete items[i].swDuration;
+            delete items[i].swStartTime;
+            delete items[i].swEndTime;
+            save();
+        }
+        renderJournals();
+    }
+    function delJournal(i) { if(confirm("刪除？")){ db.journals[activeDS].splice(i,1); save(); renderJournals(); }}
+    function exportData() { const blob = new Blob([JSON.stringify(db, null, 2)], {type: 'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Backup.json`; a.click(); }
+    function triggerImport() { document.getElementById('importFile').click(); }
+    function importJSON(event) { const reader = new FileReader(); reader.onload = function(e) { try { db = JSON.parse(e.target.result); save(); location.reload(); } catch (err) { alert("失敗"); } }; reader.readAsText(event.target.files[0]); }
+    
+    function goToday() { 
+        const today = new Date(); viewMonth = new Date(today); drawerMonth = new Date(today); 
+        selectDate(getDS(today), false); 
+        setTimeout(() => {
+            const el = document.getElementById(`list-${getDS(today)}`);
+            if(el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+    }
+
+    function toggleCalendar() {
+        isCalExpanded = !isCalExpanded;
+        const drawer = document.getElementById('calDrawer');
+        drawer.classList.toggle('expanded', isCalExpanded);
+        drawer.classList.toggle('collapsed', !isCalExpanded);
+        document.getElementById('drawerArrow').innerText = isCalExpanded ? " ▲" : " ▼";
+        renderMiniCal();
+    }
+
+    function renderMiniCal() {
+        const grid = document.getElementById('miniCalGrid'); if(!grid) return; grid.innerHTML = '';
+        ['一','二','三','四','五','六','日'].forEach(l => grid.innerHTML += `<div style="font-size:0.75rem; color:#888;">${l}</div>`);
+        const y = drawerMonth.getFullYear(), m = drawerMonth.getMonth();
+        document.getElementById('miniMonthTitle').innerText = `${monthNames[m]} ${y}`;
+        if (isCalExpanded) {
+            let firstDay = new Date(y, m, 1).getDay(); firstDay = (firstDay === 0) ? 6 : firstDay - 1; 
+            const lastDate = new Date(y, m+1, 0).getDate();
+            for(let i=0; i<firstDay; i++) grid.innerHTML += `<div></div>`;
+            for(let d=1; d<=lastDate; d++) {
+                const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                grid.innerHTML += `<div class="cal-date ${ds===activeDS?'selected':''} ${ (new Date(ds).getDay()===0||new Date(ds).getDay()===6)?'is-weekend':''}" onclick="selectDate('${ds}')">${d}</div>`;
+            }
+        } else {
+            const curr = new Date(activeDS); const diff = (curr.getDay() === 0 ? -6 : 1 - curr.getDay());
+            const start = new Date(curr); start.setDate(curr.getDate() + diff);
+            for(let i=0; i<7; i++) {
+                const d = new Date(start); d.setDate(start.getDate() + i); const ds = getDS(d);
+                grid.innerHTML += `<div class="cal-date ${ds===activeDS?'selected':''} ${ (d.getDay()===0||d.getDay()===6)?'is-weekend':''}" onclick="selectDate('${ds}')">${d.getDate()}</div>`;
+            }
+        }
+    }
+
+    function renderWeek() {
+        const grid = document.getElementById('weekGrid'); if(!grid) return; grid.innerHTML = '';
+        const curr = new Date(activeDS); const day = curr.getDay();
+        const diff = (day === 0 ? -6 : 1 - day);
+        const start = new Date(curr); start.setDate(curr.getDate() + diff);
+        document.getElementById('weekTitle').innerText = `${start.getFullYear()} / ${start.getMonth()+1}月`;
+        for(let i=0; i<7; i++) {
+            const d = new Date(start); d.setDate(start.getDate() + i); const ds = getDS(d);
+            grid.innerHTML += `<div class="week-card ${ds===getDS(new Date())?'today':''}">
+                <div class="week-day-title" onclick="selectDate('${ds}')">
+                    <span style="color:${(d.getDay()===0||d.getDay()===6)?'var(--accent-red)':'white'}">${d.getMonth()+1}/${d.getDate()} (${weekDaysShort[d.getDay()]})</span>
+                </div>
+                <div class="week-day-content sync-${ds}" contenteditable="true" onblur="updateCal('${ds}', this.innerText)">${db.calendar[ds]||''}</div>
+            </div>`;
+        }
+        renderWeekPhotoCal();
+    }
+
+    function renderWeekPhotoCal() {
+        const grid = document.getElementById('weekPhotoCalGrid'); if(!grid) return;
+        const base = new Date(activeDS);
+        const y = base.getFullYear(), m = base.getMonth();
+
+        // 找出當前週的日期範圍（高亮用）
+        const curr = new Date(activeDS); const day = curr.getDay();
+        const wkStart = new Date(curr); wkStart.setDate(curr.getDate() + (day===0?-6:1-day));
+        const wkDates = new Set();
+        for(let i=0;i<7;i++){
+            const d=new Date(wkStart); d.setDate(wkStart.getDate()+i);
+            wkDates.add(getDS(d));
+        }
+
+        const today = getDS();
+        const firstDay = new Date(y, m, 1).getDay();
+        const daysInMonth = new Date(y, m+1, 0).getDate();
+        const totalCells = firstDay + daysInMonth;
+        const rows = Math.ceil(totalCells / 7);
+        grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+        grid.innerHTML = '';
+
+        for(let k=0;k<firstDay;k++){
+            const blank=document.createElement('div'); blank.className='wpc-cell empty'; grid.appendChild(blank);
+        }
+        for(let d=1;d<=daysInMonth;d++){
+            const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const isWkend=[0,6].includes(new Date(y,m,d).getDay());
+            const cell=document.createElement('div');
+            cell.className='wpc-cell'+(ds===today?' today':'')+(wkDates.has(ds)?' active-week':'');
+            const photoData=db.photos&&db.photos[ds];
+            if(photoData){
+                const img=document.createElement('img'); img.src=photoData; img.loading='lazy';
+                cell.appendChild(img);
+                cell.onclick=()=>openPhotoPreview(ds);
+            } else {
+                const add=document.createElement('span'); add.className='wpc-cell-add'; add.textContent='+';
+                cell.appendChild(add);
+                cell.onclick=()=>triggerPhotoUpload(ds);
+            }
+            const lbl=document.createElement('span');
+            lbl.className='wpc-cell-date'+(isWkend?' wkend':''); lbl.textContent=d;
+            cell.appendChild(lbl);
+            grid.appendChild(cell);
+        }
+    }
+
+    function renderList() {
+        const list = document.getElementById('calendarList'); if(!list) return; list.innerHTML = '';
+        const y = viewMonth.getFullYear(), m = viewMonth.getMonth();
+        document.getElementById('monthTitle').innerText = `${monthNames[m]} ${y}`;
+        const lastDay = new Date(y, m+1, 0).getDate();
+        for(let d=1; d<=lastDay; d++) {
+            const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const isWeekend = (new Date(ds).getDay()===0||new Date(ds).getDay()===6);
+            list.innerHTML += `<div class="day-row ${ds === activeDS?'selected':''}" id="list-${ds}">
+                <div class="day-num-box" onclick="selectDate('${ds}', false)">
+                    <div class="day-num ${isWeekend?'is-weekend-text':''}">${d}</div>
+                    <div class="day-weekday ${isWeekend?'is-weekend-text':''}">${weekDaysShort[new Date(ds).getDay()]}</div>
+                </div>
+                <div class="day-content sync-${ds}" contenteditable="true" onblur="updateCal('${ds}', this.innerText)">${db.calendar[ds]||''}</div>
+            </div>`;
+        }
+    }
+
+    function linkify(text) {
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        const parts = text.split(urlRegex);
+        const frag = document.createDocumentFragment();
+        parts.forEach(part => {
+            if (/^https?:\/\//.test(part)) {
+                const a = document.createElement('a');
+                a.href = part;
+                a.textContent = part;
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                a.style.cssText = 'color:#64b5f6;word-break:break-all;text-decoration:none;border-bottom:1px solid rgba(100,181,246,0.35);';
+                frag.appendChild(a);
+            } else if (part) {
+                frag.appendChild(document.createTextNode(part));
+            }
+        });
+        return frag;
+    }
+
+    // 書籤編輯狀態：{ idx: true/false }
+    let bmEditState = {};
+
+    function renderBookmarkUI() {
+        if(isManaging) { renderManageUI(); return; }
+        const tabs = document.getElementById('bookmarkTabs'); if(!tabs) return;
+        tabs.innerHTML = '';
+        db.catOrder.forEach(cat => {
+            tabs.innerHTML += `<button class="btn-sm" style="white-space:nowrap; border-radius:20px; ${currentCat===cat?'background:var(--accent-gray);color:black':''}" onclick="currentCat='${cat}';bmEditState={};renderBookmarkUI()">${cat}</button>`;
+        });
+        const content = document.getElementById('bookmarkContent'); if(!content) return;
+        content.innerHTML = '';
+        (db.bookmarks[currentCat] || []).forEach((b, i) => {
+            const item = document.createElement('div');
+            item.dataset.bmIdx = i;
+
+            if(bmEditState[i]) {
+                // ── 編輯模式 ──
+                item.className = 'bookmark-item-edit';
+                const ta = document.createElement('textarea');
+                ta.className = 'bm-edit-textarea';
+                ta.value = b.text || '';
+                ta.id = `bmEdit_${i}`;
+                ta.oninput = () => autoResize(ta);
+                const btnRow = document.createElement('div');
+                btnRow.className = 'bm-btn-row';
+                const cancelBtn = document.createElement('button');
+                cancelBtn.className = 'bm-cancel-btn';
+                cancelBtn.textContent = '取消';
+                cancelBtn.onclick = () => {
+                    if(b._isNew) {
+                        db.bookmarks[currentCat].splice(i, 1);
+                        save();
+                    }
+                    delete bmEditState[i];
+                    renderBookmarkUI();
+                };
+                const saveBtn = document.createElement('button');
+                saveBtn.className = 'bm-save-btn';
+                saveBtn.textContent = '儲存';
+                saveBtn.onclick = () => {
+                    const val = document.getElementById(`bmEdit_${i}`)?.value.trim() || '';
+                    if(!val) return;
+                    db.bookmarks[currentCat][i].text = val;
+                    delete db.bookmarks[currentCat][i]._isNew;
+                    delete bmEditState[i];
+                    save(); renderBookmarkUI();
+                };
+                btnRow.appendChild(cancelBtn);
+                btnRow.appendChild(saveBtn);
+                item.appendChild(ta);
+                item.appendChild(btnRow);
+                setTimeout(() => { autoResize(ta); ta.focus(); }, 0);
+            } else {
+                // ── 唯讀模式 ──
+                item.className = 'bookmark-item';
+                item.setAttribute('draggable', 'true');
+
+                const handle = document.createElement('span');
+                handle.className = 'bm-drag-handle';
+                handle.textContent = '⠿';
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'bm-del-btn';
+                delBtn.textContent = '✕';
+                delBtn.onclick = () => delBookmarkItem(i);
+
+                const textDiv = document.createElement('div');
+                textDiv.className = 'bm-text';
+                textDiv.style.cursor = 'pointer';
+                textDiv.appendChild(linkify(b.text));
+                textDiv.ondblclick = () => { bmEditState[i] = true; renderBookmarkUI(); };
+
+                const dateSpan = document.createElement('span');
+                dateSpan.className = 'bm-date';
+                dateSpan.textContent = b.date || '';
+
+                item.appendChild(handle);
+                item.appendChild(delBtn);
+                item.appendChild(textDiv);
+                item.appendChild(dateSpan);
+            }
+            content.appendChild(item);
+        });
+        content.scrollTop = content.scrollHeight;
+        attachBmDragHandlers(content);
+    }
+
+    function attachBmDragHandlers(container) {
+        let dragSrcIdx = null;
+        container.querySelectorAll('.bookmark-item[draggable]').forEach(item => {
+            item.addEventListener('dragstart', e => {
+                dragSrcIdx = parseInt(item.dataset.bmIdx);
+                item.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            item.addEventListener('dragend', () => {
+                item.classList.remove('dragging');
+                container.querySelectorAll('.bookmark-item.drag-over').forEach(r => r.classList.remove('drag-over'));
+            });
+            item.addEventListener('dragover', e => {
+                e.preventDefault();
+                container.querySelectorAll('.bookmark-item.drag-over').forEach(r => r.classList.remove('drag-over'));
+                const destIdx = parseInt(item.dataset.bmIdx);
+                if(destIdx !== dragSrcIdx) item.classList.add('drag-over');
+            });
+            item.addEventListener('drop', e => {
+                e.preventDefault();
+                const destIdx = parseInt(item.dataset.bmIdx);
+                if(dragSrcIdx === null || dragSrcIdx === destIdx) return;
+                const items = db.bookmarks[currentCat];
+                const moved = items.splice(dragSrcIdx, 1)[0];
+                items.splice(destIdx, 0, moved);
+                dragSrcIdx = null;
+                save(); renderBookmarkUI();
+            });
+
+            // Touch
+            const handle = item.querySelector('.bm-drag-handle');
+            if(!handle) return;
+            let touchSrc = null, cloneEl = null;
+            handle.addEventListener('touchstart', e => {
+                touchSrc = parseInt(item.dataset.bmIdx);
+                item.classList.add('dragging');
+                cloneEl = item.cloneNode(true);
+                cloneEl.style.cssText = 'position:fixed;z-index:9000;opacity:0.85;pointer-events:none;width:' + item.offsetWidth + 'px;background:var(--bm-card);border-radius:10px;padding:14px;';
+                document.body.appendChild(cloneEl);
+            }, { passive: true });
+            handle.addEventListener('touchmove', e => {
+                e.preventDefault();
+                const t = e.touches[0];
+                if(cloneEl) { cloneEl.style.left=(t.clientX-30)+'px'; cloneEl.style.top=(t.clientY-20)+'px'; }
+                container.querySelectorAll('.bookmark-item.drag-over').forEach(r => r.classList.remove('drag-over'));
+                const el = document.elementFromPoint(t.clientX, t.clientY);
+                const over = el?.closest('.bookmark-item[draggable]');
+                if(over && parseInt(over.dataset.bmIdx) !== touchSrc) over.classList.add('drag-over');
+            }, { passive: false });
+            handle.addEventListener('touchend', e => {
+                if(cloneEl) { cloneEl.remove(); cloneEl = null; }
+                item.classList.remove('dragging');
+                container.querySelectorAll('.bookmark-item.drag-over').forEach(r => r.classList.remove('drag-over'));
+                const t = e.changedTouches[0];
+                const el = document.elementFromPoint(t.clientX, t.clientY);
+                const destItem = el?.closest('.bookmark-item[draggable]');
+                if(!destItem) return;
+                const destIdx = parseInt(destItem.dataset.bmIdx);
+                if(touchSrc === null || touchSrc === destIdx) return;
+                const items = db.bookmarks[currentCat];
+                const moved = items.splice(touchSrc, 1)[0];
+                items.splice(destIdx, 0, moved);
+                save(); renderBookmarkUI();
+            });
+        });
+    }
+
+    function toggleBookmarkManage() {
+        isManaging = !isManaging;
+        document.getElementById('bookmarkNormalUI').style.display = isManaging ? 'none' : 'flex';
+        document.getElementById('bookmarkManageUI').style.display = isManaging ? 'flex' : 'none';
+        document.getElementById('manageBtn').innerHTML = isManaging ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
+        if(isManaging) renderManageUI(); else renderBookmarkUI();
+    }
+
+    function renderManageUI() {
+        const list = document.getElementById('categoryManageList'); 
+        if(!list) return;
+        list.innerHTML = '';
+        db.catOrder.forEach((cat, idx) => {
+            const isFirst = idx === 0, isLast = idx === db.catOrder.length - 1;
+            list.innerHTML += `
+            <div style="display:flex; align-items:center; gap:8px; background:#252525; padding:10px 12px; border-radius:10px; margin-bottom:10px; border:1px solid #333;">
+                <div style="display:flex; flex-direction:column; gap:2px;">
+                    <button onclick="moveCat(${idx},-1)" style="background:none;border:none;color:${isFirst?'#444':'#aaa'};font-size:0.8rem;cursor:pointer;padding:2px 5px;line-height:1;" ${isFirst?'disabled':''}>▲</button>
+                    <button onclick="moveCat(${idx},1)" style="background:none;border:none;color:${isLast?'#444':'#aaa'};font-size:0.8rem;cursor:pointer;padding:2px 5px;line-height:1;" ${isLast?'disabled':''}>▼</button>
+                </div>
+                <input type="text" value="${cat}" style="flex:1; background:transparent; border:1px solid #444; color:white; padding:7px 10px; border-radius:6px; font-size:0.9rem; outline:none;" onchange="renameCat(${idx}, this.value)">
+                <button onclick="deleteCat(${idx})" style="background:none;border:none;color:#ff453a;font-size:1.1rem;cursor:pointer;padding:4px 6px;">🗑️</button>
+            </div>`;
+        });
+    }
+
+    function addCat() {
+        const input = document.getElementById('newCatInput');
+        const name = input.value.trim();
+        if(!name) return;
+        if(db.catOrder.includes(name)) { alert("分類名稱已存在"); return; }
+        db.catOrder.push(name);
+        if(!db.bookmarks[name]) db.bookmarks[name] = [];
+        input.value = '';
+        save(); renderManageUI();
+    }
+
+    function renameCat(idx, newName) {
+        newName = newName.trim();
+        if(!newName) return;
+        const old = db.catOrder[idx];
+        if(old === newName) return;
+        if(db.catOrder.includes(newName)) { alert("名稱已存在"); renderManageUI(); return; }
+        db.catOrder[idx] = newName;
+        db.bookmarks[newName] = db.bookmarks[old] || [];
+        delete db.bookmarks[old];
+        if(currentCat === old) currentCat = newName;
+        save(); renderManageUI();
+    }
+
+    function deleteCat(idx) {
+        const cat = db.catOrder[idx];
+        const count = (db.bookmarks[cat] || []).length;
+        if(count > 0 && !confirm(`「${cat}」含有 ${count} 筆書籤，確定刪除？`)) return;
+        if(count === 0 && !confirm(`刪除分類「${cat}」？`)) return;
+        db.catOrder.splice(idx, 1);
+        delete db.bookmarks[cat];
+        if(currentCat === cat) currentCat = db.catOrder[0] || '';
+        save(); renderManageUI();
+    }
+
+    function moveCat(idx, dir) {
+        const newIdx = idx + dir;
+        if(newIdx < 0 || newIdx >= db.catOrder.length) return;
+        [db.catOrder[idx], db.catOrder[newIdx]] = [db.catOrder[newIdx], db.catOrder[idx]];
+        save(); renderManageUI();
+    }
+
+    function addBookmarkContent() {
+        const input = document.getElementById('bmInput');
+        const text = input?.value.trim() || '';
+        if(!currentCat) return;
+        if(!db.bookmarks[currentCat]) db.bookmarks[currentCat] = [];
+        // 若輸入欄有內容直接存，否則新增空草稿進編輯模式
+        const newItem = { date: new Date().toLocaleDateString(), text, _isNew: true };
+        db.bookmarks[currentCat].push(newItem);
+        const newIdx = db.bookmarks[currentCat].length - 1;
+        if(input) { input.value = ''; input.style.height = '42px'; }
+        if(text) {
+            delete newItem._isNew;
+            save(); renderBookmarkUI();
+        } else {
+            bmEditState[newIdx] = true;
+            renderBookmarkUI();
+        }
+    }
+    function delBookmarkItem(idx) { if(confirm("刪除內容？")) { db.bookmarks[currentCat].splice(idx, 1); save(); renderBookmarkUI(); }}
+
+
+    // ===== 搜尋功能 =====
+    let searchItems = [];
+
+    function openSearch() {
+        document.getElementById('searchOverlay').classList.add('open');
+        setTimeout(() => document.getElementById('searchInput').focus(), 300);
+    }
+
+    function closeSearch() {
+        document.getElementById('searchOverlay').classList.remove('open');
+        document.getElementById('searchInput').value = '';
+        document.getElementById('searchResults').innerHTML = '<div class="search-empty">輸入關鍵字開始搜尋</div>';
+    }
+
+    function highlight(text, kw) {
+        const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return text.replace(new RegExp(escaped, 'gi'), m => `<mark>${m}</mark>`);
+    }
+
+    function doSearch(kw) {
+        const results = document.getElementById('searchResults');
+        kw = kw.trim();
+        if (!kw) {
+            results.innerHTML = '<div class="search-empty">輸入關鍵字開始搜尋</div>';
+            return;
+        }
+        const kwLower = kw.toLowerCase();
+        searchItems = [];
+
+        // 時間軸
+        Object.entries(db.journals).forEach(([date, entries]) => {
+            (entries || []).forEach(j => {
+                if (j.text.toLowerCase().includes(kwLower)) {
+                    searchItems.push({
+                        type: '時間軸', date, text: j.text, meta: j.time + '　' + date,
+                        action: () => {
+                            closeSearch();
+                            const d = new Date(date);
+                            viewMonth = new Date(d); drawerMonth = new Date(d);
+                            selectDate(date, false);
+                            switchPanel(5);
+                            setTimeout(() => {
+                                const flow = document.getElementById('journalFlow');
+                                if (flow) flow.scrollTop = 0;
+                            }, 200);
+                        }
+                    });
+                }
+            });
+        });
+
+        // 行事曆
+        Object.entries(db.calendar).forEach(([date, text]) => {
+            if (text && text.toLowerCase().includes(kwLower)) {
+                searchItems.push({
+                    type: '行事曆', date, text, meta: date,
+                    action: () => {
+                        closeSearch();
+                        const d = new Date(date);
+                        viewMonth = new Date(d);
+                        selectDate(date, false);
+                        switchPanel(1);
+                        setTimeout(() => {
+                            const el = document.getElementById('list-' + date);
+                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }, 200);
+                    }
+                });
+            }
+        });
+
+        // 書籤
+        db.catOrder.forEach(cat => {
+            (db.bookmarks[cat] || []).forEach(b => {
+                if (b.text.toLowerCase().includes(kwLower)) {
+                    searchItems.push({
+                        type: '書籤・' + cat, date: b.date || '', text: b.text, meta: b.date || '',
+                        action: () => {
+                            closeSearch();
+                            currentCat = cat;
+                            switchPanel(2);
+                        }
+                    });
+                }
+            });
+        });
+
+        // 購物
+        (db.shop || []).forEach(card => {
+            const fields = [];
+            if(card.title)   fields.push(card.title);
+            if(card.program) fields.push(card.program);
+            if(card.venue)   fields.push(card.venue);
+            if(card.zone)    fields.push(card.zone);
+            if(card.seat)    fields.push(card.seat);
+            (card.items || []).forEach(it => { if(it.name) fields.push(it.name); });
+            const combined = fields.join(' ');
+            if(combined.toLowerCase().includes(kwLower)) {
+                const sortDate = getShopSortDate(card);
+                const displayText = card.category === '表演'
+                    ? (card.program || card.title || '（未命名）')
+                    : (card.title || (card.items||[]).map(it=>it.name).filter(Boolean).join('、') || '（未命名）');
+                searchItems.push({
+                    type: '購物・' + (card.category || ''), date: sortDate, text: displayText,
+                    meta: sortDate + (card.currency ? '　' + (currencies[card.currency]||card.currency) : ''),
+                    action: () => {
+                        closeSearch();
+                        if(sortDate) shopViewMonth = new Date(sortDate.slice(0,7) + '-01T00:00:00');
+                        currentShopCat = card.category || '全部';
+                        switchPanel(3);
+                    }
+                });
+            }
+        });
+
+        // 星象：當前星象
+        if(Array.isArray(db.astro?.current)) {
+            db.astro.current.forEach(item => {
+                const combined = [item.title, item.period, item.text].filter(Boolean).join(' ');
+                if(combined.toLowerCase().includes(kwLower)) {
+                    searchItems.push({
+                        type: '星象・當前', date: item.dateStart || '', text: item.title || item.text || '（未命名）',
+                        meta: item.period || '',
+                        action: () => { closeSearch(); switchPanel(4); }
+                    });
+                }
+            });
+        }
+
+        // 星象：月/週運勢
+        ['month', 'week'].forEach(type => {
+            const data = db.astro?.[type];
+            if(!data) return;
+            const label = type === 'month' ? '月運勢' : '週運勢';
+            const combined = [data.period, data.text, ...Object.values(data.signs||{})].filter(Boolean).join(' ');
+            if(combined.toLowerCase().includes(kwLower)) {
+                searchItems.push({
+                    type: '星象・' + label, date: '', text: data.text || data.period || label,
+                    meta: data.period || '',
+                    action: () => { closeSearch(); switchPanel(4); }
+                });
+            }
+            // 各星座
+            Object.entries(data.signs || {}).forEach(([sign, text]) => {
+                if(text && text.toLowerCase().includes(kwLower)) {
+                    searchItems.push({
+                        type: `星象・${label}・${sign}`, date: '', text,
+                        meta: data.period || '',
+                        action: () => { closeSearch(); switchPanel(4); }
+                    });
+                }
+            });
+        });
+
+        // 星盤
+        (db.astro?.charts || []).forEach(chart => {
+            [...(chart.positions||[]), ...(chart.houses||[])].forEach(row => {
+                const combined = Object.values(row).join(' ');
+                if(combined.toLowerCase().includes(kwLower)) {
+                    searchItems.push({
+                        type: '星盤・' + (chart.name || ''), date: '', text: combined,
+                        meta: chart.name || '',
+                        action: () => { closeSearch(); switchPanel(4); }
+                    });
+                }
+            });
+        });
+
+        searchItems.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+        if (searchItems.length === 0) {
+            results.innerHTML = '<div class="search-empty">找不到相關結果</div>';
+            return;
+        }
+
+        results.innerHTML = searchItems.map((item, idx) => {
+            const safeText = item.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            return `<div class="search-result-item" onclick="searchItems[${idx}].action()">
+                <div class="search-result-source">${item.type}</div>
+                <div class="search-result-text">${highlight(safeText, kw)}</div>
+                <div class="search-result-meta">${item.meta}</div>
+            </div>`;
+        }).join('');
+    }
+
+
+    function autoResize(el) {
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    }
+
+
+
+    // ── 購物商品拖移排序 ─────────────────────────────────────────────
+    let shopDragSrcCardId = null;
+    let shopDragSrcIdx    = null;
+
+    function attachShopDragHandlers() {
+        document.querySelectorAll('.shop-item-row[draggable]').forEach(row => {
+            row.addEventListener('dragstart', e => {
+                shopDragSrcCardId = parseInt(row.dataset.cardId);
+                shopDragSrcIdx    = parseInt(row.dataset.idx);
+                row.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            row.addEventListener('dragend', () => {
+                row.classList.remove('dragging');
+                document.querySelectorAll('.shop-item-row.drag-over')
+                    .forEach(r => r.classList.remove('drag-over'));
+            });
+            row.addEventListener('dragover', e => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                document.querySelectorAll('.shop-item-row.drag-over')
+                    .forEach(r => r.classList.remove('drag-over'));
+                if(parseInt(row.dataset.idx) !== shopDragSrcIdx) {
+                    row.classList.add('drag-over');
+                }
+            });
+            row.addEventListener('drop', e => {
+                e.preventDefault();
+                const destIdx = parseInt(row.dataset.idx);
+                if(shopDragSrcIdx === null || shopDragSrcIdx === destIdx) return;
+                const card = db.shop.find(c => c.id === shopDragSrcCardId);
+                if(!card) return;
+                // 先從 DOM 同步目前輸入值
+                syncCardFromDOM(card);
+                // 重新排序 items
+                const moved = card.items.splice(shopDragSrcIdx, 1)[0];
+                card.items.splice(destIdx, 0, moved);
+                save();
+                renderShop();
+            });
+        });
+
+        // Touch 拖移（手機）
+        document.querySelectorAll('.shop-drag-handle').forEach(handle => {
+            let touchRow = null, touchSrcIdx = null, touchCardId = null, cloneEl = null;
+
+            handle.addEventListener('touchstart', e => {
+                touchRow    = handle.closest('.shop-item-row');
+                touchCardId = parseInt(touchRow.dataset.cardId);
+                touchSrcIdx = parseInt(touchRow.dataset.idx);
+                touchRow.classList.add('dragging');
+                // 建立視覺複製
+                cloneEl = touchRow.cloneNode(true);
+                cloneEl.style.cssText = 'position:fixed;z-index:9000;opacity:0.85;pointer-events:none;width:' + touchRow.offsetWidth + 'px;background:#2c2c2e;border-radius:10px;padding:6px;';
+                document.body.appendChild(cloneEl);
+            }, { passive: true });
+
+            handle.addEventListener('touchmove', e => {
+                e.preventDefault();
+                const t = e.touches[0];
+                if(cloneEl) { cloneEl.style.left = (t.clientX - 30) + 'px'; cloneEl.style.top = (t.clientY - 20) + 'px'; }
+                // 找到目前手指下的 row
+                document.querySelectorAll('.shop-item-row.drag-over').forEach(r => r.classList.remove('drag-over'));
+                const el = document.elementFromPoint(t.clientX, t.clientY);
+                const overRow = el?.closest('.shop-item-row[draggable]');
+                if(overRow && parseInt(overRow.dataset.idx) !== touchSrcIdx) overRow.classList.add('drag-over');
+            }, { passive: false });
+
+            handle.addEventListener('touchend', e => {
+                if(cloneEl) { cloneEl.remove(); cloneEl = null; }
+                if(touchRow) touchRow.classList.remove('dragging');
+                document.querySelectorAll('.shop-item-row.drag-over').forEach(r => r.classList.remove('drag-over'));
+                const t = e.changedTouches[0];
+                const el = document.elementFromPoint(t.clientX, t.clientY);
+                const destRow = el?.closest('.shop-item-row[draggable]');
+                if(!destRow) return;
+                const destIdx = parseInt(destRow.dataset.idx);
+                if(touchSrcIdx === null || touchSrcIdx === destIdx) return;
+                const card = db.shop.find(c => c.id === touchCardId);
+                if(!card) return;
+                syncCardFromDOM(card);
+                const moved = card.items.splice(touchSrcIdx, 1)[0];
+                card.items.splice(destIdx, 0, moved);
+                save(); renderShop();
+            });
+        });
+    }
+
+
+    // ══════════ 照片月曆 ══════════════════════════════════════
+    let photoViewMonth = new Date();
+    let currentPreviewDate = null;
+    let pendingPhotoDate   = null;
+
+    function changePhotoMonth(dir) {
+        photoViewMonth = new Date(photoViewMonth.getFullYear(), photoViewMonth.getMonth() + dir, 1);
+        renderPhotoCalendar();
+    }
+
+    function renderPhotoCalendar() {
+        const grid = document.getElementById('photoCalGrid'); if(!grid) return;
+        const titleEl = document.getElementById('photoMonthTitle');
+        const y = photoViewMonth.getFullYear(), m = photoViewMonth.getMonth();
+        if(titleEl) titleEl.textContent = `${y} 年 ${String(m+1).padStart(2,'0')} 月`;
+
+        if(!db.photos) db.photos = {};
+        const today = getDS();
+        const firstDay = new Date(y, m, 1).getDay(); // 0=Sun
+        const daysInMonth = new Date(y, m+1, 0).getDate();
+
+        grid.innerHTML = '';
+        // 空格
+        for(let k=0; k<firstDay; k++) {
+            const blank = document.createElement('div');
+            blank.className = 'photo-cell empty';
+            grid.appendChild(blank);
+        }
+        for(let d=1; d<=daysInMonth; d++) {
+            const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const isWeekend = [0,6].includes(new Date(y,m,d).getDay());
+            const isToday   = ds === today;
+            const cell = document.createElement('div');
+            cell.className = 'photo-cell' + (isToday?' today':'') + (db.photos[ds]?' has-photo':'');
+            const photoData = db.photos[ds];
+            if(photoData) {
+                const img = document.createElement('img');
+                img.src = photoData;
+                img.loading = 'lazy';
+                cell.appendChild(img);
+                cell.onclick = () => openPhotoPreview(ds);
+            } else {
+                const add = document.createElement('span');
+                add.className = 'photo-cell-add';
+                add.textContent = '+';
+                cell.appendChild(add);
+                cell.onclick = () => triggerPhotoUpload(ds);
+            }
+            const dateLabel = document.createElement('span');
+            dateLabel.className = 'photo-cell-date' + (isWeekend?' weekend':'');
+            dateLabel.textContent = d;
+            cell.appendChild(dateLabel);
+            grid.appendChild(cell);
+        }
+    }
+
+    function triggerPhotoUpload(ds) {
+        pendingPhotoDate = ds;
+        document.getElementById('photoFileInput').value = '';
+        document.getElementById('photoFileInput').click();
+    }
+
+    function handlePhotoUpload(e) {
+        const file = e.target.files[0]; if(!file || !pendingPhotoDate) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+            // 縮小圖片以節省 localStorage
+            const img = new Image();
+            img.onload = () => {
+                const MAX = 600;
+                const ratio = Math.min(MAX/img.width, MAX/img.height, 1);
+                const canvas = document.createElement('canvas');
+                canvas.width  = Math.round(img.width  * ratio);
+                canvas.height = Math.round(img.height * ratio);
+                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                const data = canvas.toDataURL('image/jpeg', 0.7);
+                if(!db.photos) db.photos = {};
+                db.photos[pendingPhotoDate] = data;
+                save();
+                renderPhotoCalendar();
+            };
+            img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function openPhotoPreview(ds) {
+        currentPreviewDate = ds;
+        document.getElementById('photoPreviewImg').src = db.photos[ds];
+        const d = new Date(ds+'T00:00:00');
+        document.getElementById('photoPreviewDate').textContent =
+            `${d.getFullYear()} 年 ${d.getMonth()+1} 月 ${d.getDate()} 日`;
+        document.getElementById('photoPreviewOverlay').classList.remove('hidden');
+    }
+
+    function closePhotoPreview(e) {
+        if(e && e.target !== document.getElementById('photoPreviewOverlay') && !e.target.classList.contains('photo-preview-close')) return;
+        document.getElementById('photoPreviewOverlay').classList.add('hidden');
+        currentPreviewDate = null;
+    }
+
+    function deletePhoto(ds) {
+        if(!ds || !confirm('刪除這張照片？')) return;
+        delete db.photos[ds];
+        save();
+        document.getElementById('photoPreviewOverlay').classList.add('hidden');
+        currentPreviewDate = null;
+        renderPhotoCalendar();
+    }
+
+    // ═══════════════ 購物記帳 ═══════════════
+    const shopCats = ['全部', '3C', '衣物', '鞋包', '表演', '好市多', '其他'];
+    let shopViewMonth = new Date(); // 當前檢視的年月
+
+    function changeShopMonth(dir) {
+        shopViewMonth = new Date(shopViewMonth.getFullYear(), shopViewMonth.getMonth() + dir, 1);
+        renderShopTabs(); renderShop();
+    }
+
+    function getShopMonthPrefix() {
+        const y = shopViewMonth.getFullYear(), m = shopViewMonth.getMonth() + 1;
+        return `${y}-${String(m).padStart(2,'0')}`;
+    }
+    const currencies = { 'TWD': 'NT$', 'JPY': '¥', 'KRW': '₩', 'USD': '$' };
+    let currentShopCat = '全部';
+
+    function fmtPrice(currency, price) {
+        const sym = currencies[currency] || currency;
+        const num = parseFloat(price);
+        if(isNaN(num)) return sym + '0';
+        return sym + num.toLocaleString();
+    }
+
+    function renderShopTabs() {
+        const el = document.getElementById('shopTabs'); if(!el) return;
+        el.innerHTML = shopCats.map(cat =>
+            `<button class="shop-tab ${currentShopCat===cat?'active':''}" onclick="currentShopCat='${cat}';renderShopTabs();renderShop()">${cat}</button>`
+        ).join('');
+    }
+
+    function getShopSortDate(card) {
+        return card.category === '表演' ? (card.perfDate || card.date || '') : (card.date || '');
+    }
+
+    function renderShop() {
+        const grid = document.getElementById('shopGrid'); if(!grid) return;
+        const prefix = getShopMonthPrefix();
+        const y = shopViewMonth.getFullYear(), m = shopViewMonth.getMonth() + 1;
+
+        // 更新 header 月份標題
+        const titleEl = document.getElementById('shopMonthTitle');
+        if(titleEl) titleEl.textContent = `${y} 年 ${String(m).padStart(2,'0')} 月`;
+
+        // 過濾：先過濾月份，再過濾分類
+        let cards = db.shop.filter(c => {
+            const sortDate = getShopSortDate(c);
+            return sortDate.startsWith(prefix) || (!c.published && !sortDate); // 未發佈草稿也顯示
+        });
+        if(currentShopCat !== '全部') cards = cards.filter(c => c.category === currentShopCat);
+        cards.sort((a,b) => getShopSortDate(a).localeCompare(getShopSortDate(b)));
+
+        // 計算當月已發佈 TWD 合計（只計 TWD，其他幣別標注）
+        const summary = {};
+        cards.filter(c => c.published).forEach(card => {
+            const cur = card.currency || 'TWD';
+            let amt = 0;
+            if(card.category === '表演') {
+                amt = parseFloat(card.price) || 0;
+            } else {
+                amt = (card.items||[]).reduce((s,it) => s + (parseFloat(it.price)||0), 0);
+            }
+            if(!summary[cur]) summary[cur] = 0;
+            summary[cur] += amt;
+        });
+        const summaryEl = document.getElementById('shopMonthSummary');
+        const amtEl = document.getElementById('shopMonthAmount');
+        const publishedCards = cards.filter(c => c.published);
+        if(summaryEl && amtEl) {
+            if(publishedCards.length > 0) {
+                summaryEl.style.display = 'flex';
+                amtEl.textContent = Object.entries(summary)
+                    .map(([cur, amt]) => (currencies[cur]||cur) + amt.toLocaleString())
+                    .join('　');
+            } else {
+                summaryEl.style.display = 'none';
+            }
+        }
+
+        grid.innerHTML = '';
+        cards.forEach(card => {
+            const div = document.createElement('div');
+            div.setAttribute('data-card-id', card.id);
+            if(!card.published) {
+                div.innerHTML = buildEditCard(card);
+            } else {
+                div.innerHTML = card.category === '表演' ? buildTicketCard(card) : buildViewCard(card);
+            }
+            grid.appendChild(div);
+        });
+        // 新增按鈕
+        const addBtn = document.createElement('button');
+        addBtn.className = 'shop-add-card-btn';
+        addBtn.textContent = '＋ 新增記帳';
+        addBtn.onclick = addShopCard;
+        grid.appendChild(addBtn);
+        grid.scrollTop = 0;
+        attachShopDragHandlers();
+    }
+
+    function buildEditCard(card) {
+        const isPerf = card.category === '表演';
+        const isNew = !card._wasPublished; // 從未發佈過 → 取消時直接刪除
+        const headerNote = `<input class="shop-card-title" placeholder="${isPerf ? '備注' : '備注（地點、用途）'}" value="${escHtml(card.title||'')}">`;
+        const currSel = `<select class="shop-currency-select">${['TWD','JPY','KRW','USD'].map(c=>`<option value="${c}" ${card.currency===c?'selected':''}>${c}</option>`).join('')}</select>`;
+        const btnRow = `<div class="shop-btn-row">
+            <button class="shop-cancel-btn" onclick="cancelShopCard(${card.id}, ${isNew})">取消</button>
+            <button class="shop-publish-btn" onclick="publishShopCard(${card.id})">儲存</button>
+        </div>`;
+
+        if(isPerf) {
+            return `<div class="shop-card-edit">
+                <div class="shop-card-header">${headerNote}${currSel}</div>
+                <input class="perf-field perf-program" placeholder="節目名稱" value="${escHtml(card.program||'')}">
+                <div class="perf-row">
+                    <input type="date" class="perf-field perf-perfdate" value="${card.perfDate||''}">
+                    <input type="time" class="perf-field perf-perftime" value="${card.perfTime||''}">
+                </div>
+                <input class="perf-field perf-zone" placeholder="票價區域（如：A區）" value="${escHtml(card.zone||'')}">
+                <input class="perf-field perf-seat" placeholder="座位（如：3排5號）" value="${escHtml(card.seat||'')}">
+                <input class="perf-field perf-venue" placeholder="場地" value="${escHtml(card.venue||'')}">
+                <input type="date" class="shop-date-input" placeholder="購買日期" value="${card.date||''}">
+                <input type="number" class="perf-price-input perf-price" placeholder="票價" value="${escHtml(card.price||'')}">
+                ${btnRow}
+            </div>`;
+        } else {
+            const rows = (card.items||[{name:'',price:''}]).map((it,i) =>
+                `<div class="shop-item-row" draggable="true" data-card-id="${card.id}" data-idx="${i}">
+                    <span class="shop-drag-handle">⠿</span>
+                    <input class="shop-item-name" placeholder="商品名稱" value="${escHtml(it.name||'')}">
+                    <input class="shop-item-price" placeholder="0" type="number" value="${escHtml(it.price||'')}">
+                    <button class="shop-item-del" onclick="delShopItemDirect(${card.id},${i})">✕</button>
+                </div>`).join('');
+            return `<div class="shop-card-edit" id="shopEdit_${card.id}">
+                <div class="shop-card-header">
+                    <input type="date" class="shop-date-input" style="width:auto;flex:1;" value="${card.date||''}">
+                    ${headerNote}${currSel}
+                </div>
+                <div class="shop-items-list" data-card-id="${card.id}">${rows}</div>
+                <button class="shop-add-item-btn" onclick="addShopItemDirect(${card.id})">＋ 新增商品</button>
+                ${btnRow}
+            </div>`;
+        }
+    }
+
+    function buildViewCard(card) {
+        const sym = currencies[card.currency] || 'NT$';
+        const items = card.items || [];
+        const total = items.reduce((s,it) => s + (parseFloat(it.price)||0), 0);
+        const rows = items.map(it =>
+            `<div class="shop-item-line"><span>${escHtml(it.name)}</span><span>${sym}${(parseFloat(it.price)||0).toLocaleString()}</span></div>`
+        ).join('');
+        return `<div class="shop-card-view" onclick="editShopCard(${card.id})">
+            <button class="shop-card-del" onclick="event.stopPropagation();delShopCard(${card.id})">✕</button>
+            <div class="shop-badge">${escHtml(card.category)}</div>
+            <div class="shop-card-meta">${card.date||''}　${card.currency}</div>
+            ${card.title ? `<div class="shop-card-titletext">${escHtml(card.title)}</div>` : ''}
+            <hr class="shop-divider">
+            ${rows}
+            <div class="shop-item-line total"><span>合計</span><span>${sym}${total.toLocaleString()}</span></div>
+        </div>`;
+    }
+
+    function buildTicketCard(card) {
+        const sym = currencies[card.currency] || 'NT$';
+        const price = parseFloat(card.price)||0;
+        const titleNote = card.title ? `<div class="ticket-meta">${escHtml(card.title)}</div>` : '';
+        return `<div class="ticket-card" onclick="editShopCard(${card.id})" data-card-id="${card.id}">
+            <button class="shop-card-del" onclick="event.stopPropagation();delShopCard(${card.id})">✕</button>
+            <div class="ticket-top">
+                <div class="ticket-program">${escHtml(card.program||'（未填節目）')}</div>
+                <div class="ticket-meta">${card.perfDate||''} ${card.perfTime||''}</div>
+                ${titleNote}
+            </div>
+            <hr class="ticket-divider">
+            <div class="ticket-bottom">
+                <div class="ticket-field">
+                    <span class="ticket-label">票價區域</span>
+                    <span class="ticket-value">${escHtml(card.zone||'—')}</span>
+                </div>
+                <div class="ticket-field">
+                    <span class="ticket-label">座位</span>
+                    <span class="ticket-value">${escHtml(card.seat||'—')}</span>
+                </div>
+                <div class="ticket-field ticket-venue">
+                    <span class="ticket-label">場地</span>
+                    <span class="ticket-value">${escHtml(card.venue||'—')}</span>
+                </div>
+                <div class="ticket-field ticket-venue">
+                    <span class="ticket-label">購買日期</span>
+                    <span class="ticket-value">${card.date||'—'}</span>
+                </div>
+                <div class="ticket-price-row">
+                    <span class="ticket-price-label">票價</span>
+                    <span class="ticket-price-value">${sym}${price.toLocaleString()}</span>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    function escHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function syncCardFromDOM(card) {
+        const el = document.querySelector(`[data-card-id="${card.id}"]`);
+        if(!el) return;
+        const titleEl = el.querySelector('.shop-card-title');
+        if(titleEl) card.title = titleEl.value;
+        const curEl = el.querySelector('.shop-currency-select');
+        if(curEl) card.currency = curEl.value;
+        if(card.category === '表演') {
+            card.date     = el.querySelector('.shop-date-input')?.value || card.date;
+            card.perfDate = el.querySelector('.perf-perfdate')?.value || '';
+            card.perfTime = el.querySelector('.perf-perftime')?.value || '';
+            card.program  = el.querySelector('.perf-program')?.value || '';
+            card.zone     = el.querySelector('.perf-zone')?.value || '';
+            card.venue    = el.querySelector('.perf-venue')?.value || '';
+            card.seat     = el.querySelector('.perf-seat')?.value || '';
+            card.price    = el.querySelector('.perf-price')?.value || '';
+        } else {
+            card.date = el.querySelector('.shop-date-input')?.value || card.date;
+            card.items = [];
+            el.querySelectorAll('.shop-item-row').forEach(row => {
+                const name = row.querySelector('.shop-item-name')?.value || '';
+                const price = row.querySelector('.shop-item-price')?.value || '';
+                if(name || price) card.items.push({ name, price });
+            });
+        }
+    }
+
+    function addShopCard() {
+        const isPerf = currentShopCat === '表演';
+        const cat = (currentShopCat === '全部') ? '其他' : currentShopCat;
+        const card = {
+            id: Date.now(),
+            date: getDS(),
+            title: '',
+            currency: 'TWD',
+            category: cat,
+            published: false,
+            items: isPerf ? undefined : [{ name:'', price:'' }],
+            ...(isPerf ? { perfDate:'', perfTime:'', program:'', zone:'', seat:'', venue:'', price:'' } : {})
+        };
+        db.shop.push(card);
+        save();
+        renderShop();
+    }
+
+    function publishShopCard(id) {
+        const card = db.shop.find(c => c.id === id);
+        if(!card) return;
+        syncCardFromDOM(card);
+        card.published = true;
+        card._wasPublished = true;
+        save(); renderShop();
+    }
+
+    function editShopCard(id) {
+        const card = db.shop.find(c => c.id === id);
+        if(!card) return;
+        card._wasPublished = true; // 已發佈過，取消時恢復
+        card.published = false;
+        save(); renderShop();
+    }
+
+    function cancelShopCard(id, isNew) {
+        if(isNew) {
+            // 從未儲存過 → 直接刪掉
+            db.shop = db.shop.filter(c => c.id !== id);
+        } else {
+            // 已儲存過 → 恢復 published 狀態
+            const card = db.shop.find(c => c.id === id);
+            if(card) card.published = true;
+        }
+        save(); renderShop();
+    }
+
+    function delShopCard(id) {
+        if(!confirm('確定刪除這筆記帳？')) return;
+        db.shop = db.shop.filter(c => c.id !== id);
+        save(); renderShop();
+    }
+
+    function addShopItemDirect(id) {
+        const card = db.shop.find(c => c.id === id);
+        if(!card) return;
+        syncCardFromDOM(card);
+        card.items.push({ name:'', price:'' });
+        save(); renderShop();
+    }
+
+    function delShopItemDirect(id, idx) {
+        const card = db.shop.find(c => c.id === id);
+        if(!card) return;
+        syncCardFromDOM(card);
+        card.items.splice(idx, 1);
+        if(card.items.length === 0) card.items.push({ name:'', price:'' });
+        save(); renderShop();
+    }
+
+    // ══════════════════════════════════════
+    // ✦ 星象版面
+    // ══════════════════════════════════════
+    (function initAstroDB() {
+        if(!db.astro) db.astro = {};
+        const a = db.astro;
+        if(!a.current) a.current = {period:'', text:''};
+        if(!a.month)   a.month   = {period:'', text:'', signs:{}};
+        if(!a.week)    a.week    = {period:'', text:'', signs:{}};
+        if(!a.month.signs) a.month.signs = {};
+        if(!a.week.signs)  a.week.signs  = {};
+        if(!a.charts)  a.charts  = [{id:1, name:'我的星盤', positions:[], houses:[]}];
+        if(!a.collapsed) a.collapsed = {}; // { current, month, week, chart_1, ... }
+    })();
+
+    const ASTRO_SIGNS = ['♈牡羊','♉金牛','♊雙子','♋巨蟹','♌獅子','♍處女','♎天秤','♏天蠍','♐射手','♑摩羯','♒水瓶','♓雙魚'];
+    const CHART_CFG = {
+        positions: { cols:['星體','星座','度數','備註'], fields:['body','sign','degree','note'], ph:['太陽','牡羊座','15°',''] },
+        houses:    { cols:['宮位','星座','宮位守護星','飛入'], fields:['house','sign','ruler','flyinto'], ph:['第一宮','牡羊座','火星',''] },
+    };
+
+    // 各區塊的編輯狀態
+    const astroEditState = { month: false, week: false };
+    const astroChartState = {}; // { [chartId]: { tab, editing } }
+
+    function aEsc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    function renderAstroPanel() {
+        const scroll = document.getElementById('astroPanelScroll');
+        if(!scroll) return;
+        scroll.innerHTML = '';
+
+        // 同步展開狀態
+        if(db.astro.itemExpanded) {
+            Object.assign(astroCurExpanded, db.astro.itemExpanded);
+        }
+
+        // 當前星象
+        scroll.appendChild(buildCurrentAstroSection());
+        // 月運勢
+        scroll.appendChild(buildAstroSection('month'));
+        // 週運勢
+        scroll.appendChild(buildAstroSection('week'));
+        // 星盤列表
+        db.astro.charts.forEach(chart => {
+            scroll.appendChild(buildAstroChartSection(chart));
+        });
+        // 新增星盤按鈕
+        const addBtn = document.createElement('button');
+        addBtn.className = 'astro-add-chart-btn';
+        addBtn.textContent = '＋ 新增星盤';
+        addBtn.onclick = addAstroChart;
+        scroll.appendChild(addBtn);
+    }
+
+    // ── 當前星象 ──
+    let astroCurEditingId = null; // null=不在編輯, id=編輯中的項目id
+    // 每個子項目的展開狀態（itemId -> bool）
+    let astroCurExpanded = {};
+
+    function buildCurrentAstroSection() {
+        const key = 'current';
+        const collapsed = !!db.astro.collapsed[key];
+        // 相容舊格式：若 current 是 {period,text} 就轉成陣列
+        if(!Array.isArray(db.astro.current)) {
+            const old = db.astro.current || {};
+            db.astro.current = (old.period||old.text)
+                ? [{id: Date.now(), title:'', period: old.period||'', text: old.text||''}]
+                : [];
+            save();
+        }
+        const items = db.astro.current;
+
+        const section = document.createElement('div');
+        section.className = 'astro-section';
+        const inner = document.createElement('div');
+        inner.className = 'astro-section-inner';
+
+        const header = document.createElement('div');
+        header.className = 'astro-collapse-header';
+        header.innerHTML = `
+            <span class="astro-collapse-title">☿ 當前星象</span>
+            <div class="astro-collapse-right">
+                ${!collapsed ? `<button class="astro-icon-btn" onclick="event.stopPropagation();addCurAstroItem()">＋ 新增</button>` : ''}
+                <span class="astro-collapse-arrow ${collapsed?'':'open'}">▲</span>
+            </div>`;
+        header.onclick = () => toggleAstroCollapse(key);
+
+        const body = document.createElement('div');
+        body.className = `astro-collapse-body${collapsed?' hidden':''}`;
+        body.id = 'astroCurBody';
+
+        if(items.length === 0) {
+            body.innerHTML = `<div class="astro-fortune-empty">尚未新增星象項目，點「＋ 新增」開始 ✨</div>`;
+        } else {
+            if(astroCurEditingId !== null) {
+                // 編輯模式：直接顯示編輯表單（不在卡片內）
+                const editItem = items.find(i=>i.id===astroCurEditingId);
+                if(editItem) {
+                    const editEl = document.createElement('div');
+                    editEl.style.cssText = 'margin-bottom:12px;padding:12px;border-radius:12px;border:1px solid rgba(200,150,255,0.3);background:rgba(150,80,255,0.07);';
+                    editEl.id = `curItem_${editItem.id}`;
+                    editEl.innerHTML = `
+                        <input class="astro-fortune-input" id="curTitle_${editItem.id}" placeholder="星象名稱（如：水星逆行）" value="${aEsc(editItem.title)}">
+                        <div class="astro-date-row">
+                            <input type="date" class="astro-date-input" id="curDateStart_${editItem.id}" value="${editItem.dateStart||''}">
+                            <span class="astro-date-sep">～</span>
+                            <input type="date" class="astro-date-input" id="curDateEnd_${editItem.id}" value="${editItem.dateEnd||''}">
+                        </div>
+                        <textarea class="astro-fortune-textarea" id="curText_${editItem.id}" rows="4" placeholder="詳細說明...">${aEsc(editItem.text)}</textarea>
+                        <div class="astro-btn-row">
+                            <button class="astro-icon-btn" style="padding:9px 12px;color:rgba(255,100,100,0.7);border:1px solid rgba(255,100,100,0.25);" onclick="delCurAstroItem(${editItem.id})">刪除</button>
+                            <button class="astro-cancel-btn" onclick="astroCurEditingId=null;renderAstroPanel()">取消</button>
+                            <button class="astro-save-btn" onclick="saveCurAstroItem(${editItem.id})">✦ 儲存</button>
+                        </div>`;
+                    body.appendChild(editEl);
+                }
+                // 其他項目仍顯示收合卡片
+                items.filter(i=>i.id!==astroCurEditingId).forEach(item => {
+                    body.appendChild(buildCurAstroItemEl(item));
+                });
+            } else {
+                items.forEach(item => {
+                    body.appendChild(buildCurAstroItemEl(item));
+                });
+            }
+        }
+
+        inner.appendChild(header);
+        inner.appendChild(body);
+        section.appendChild(inner);
+
+        // 拖曳排序
+        setTimeout(() => attachCurAstroDrag(body), 0);
+
+        return section;
+    }
+
+    function buildCurAstroItemEl(item) {
+        const expanded = !!astroCurExpanded[item.id];
+        const itemEl = document.createElement('div');
+        itemEl.className = 'cur-astro-item';
+        itemEl.id = `curItem_${item.id}`;
+        itemEl.setAttribute('data-cur-id', item.id);
+        itemEl.draggable = true;
+
+        const headerDiv = document.createElement('div');
+        const firstLine = item.text ? aEsc(item.text.split('\n')[0]) : '';
+
+        headerDiv.className = 'cur-item-header';
+        headerDiv.innerHTML = `
+            <span class="cur-item-drag-handle" data-drag-handle="1">⠿</span>
+            <div class="cur-item-title-wrap">
+                <div class="cur-item-title">${item.title ? aEsc(item.title) : '（未命名）'}</div>
+                ${item.period ? `<div class="cur-item-period">📅 ${aEsc(item.period)}</div>` : ''}
+                ${!expanded && firstLine ? `<div class="cur-item-preview">${firstLine}</div>` : ''}
+            </div>
+            <span class="cur-item-arrow ${expanded?'open':''}">▲</span>`;
+
+        const bodyDiv = document.createElement('div');
+        bodyDiv.className = `cur-item-body${expanded?'':' hidden'}`;
+        bodyDiv.innerHTML = `
+            ${item.text ? `<div class="cur-item-text">${aEsc(item.text)}</div>` : `<div class="astro-fortune-empty" style="font-size:0.82rem;">尚無說明</div>`}
+            <div class="cur-item-actions">
+                <button class="astro-cancel-btn" style="font-size:0.8rem;padding:7px 12px;" onclick="event.stopPropagation();delCurAstroItemConfirm(${item.id})">刪除</button>
+                <button class="astro-save-btn" style="font-size:0.8rem;padding:7px 12px;" onclick="event.stopPropagation();astroCurEditingId=${item.id};astroCurExpanded[${item.id}]=false;renderAstroPanel()">編輯 ✎</button>
+            </div>`;
+
+        headerDiv.onclick = (e) => {
+            if(e.target.dataset.dragHandle) return;
+            astroCurExpanded[item.id] = !astroCurExpanded[item.id];
+            if(!db.astro.itemExpanded) db.astro.itemExpanded = {};
+            db.astro.itemExpanded[item.id] = astroCurExpanded[item.id];
+            save();
+            const arrow = headerDiv.querySelector('.cur-item-arrow');
+            const titleWrap = headerDiv.querySelector('.cur-item-title-wrap');
+            if(astroCurExpanded[item.id]) {
+                bodyDiv.classList.remove('hidden');
+                if(arrow) arrow.classList.add('open');
+                // 展開時移除預覽行
+                const prev = titleWrap.querySelector('.cur-item-preview');
+                if(prev) prev.remove();
+            } else {
+                bodyDiv.classList.add('hidden');
+                if(arrow) arrow.classList.remove('open');
+                // 收起時補回預覽行
+                if(firstLine && !titleWrap.querySelector('.cur-item-preview')) {
+                    const prevEl = document.createElement('div');
+                    prevEl.className = 'cur-item-preview';
+                    prevEl.innerHTML = firstLine;
+                    titleWrap.appendChild(prevEl);
+                }
+            }
+        };
+
+        itemEl.appendChild(headerDiv);
+        itemEl.appendChild(bodyDiv);
+        return itemEl;
+    }
+
+    // ── 拖曳排序 ──
+    let _curDragId = null;
+
+    function attachCurAstroDrag(container) {
+        let touchSrcId = null, touchLastY = 0;
+
+        container.querySelectorAll('.cur-astro-item').forEach(el => {
+            el.addEventListener('dragstart', e => {
+                _curDragId = parseInt(el.dataset.curId);
+                el.classList.add('dragging');
+            });
+            el.addEventListener('dragend', () => {
+                el.classList.remove('dragging');
+                container.querySelectorAll('.cur-astro-item').forEach(e=>e.classList.remove('drag-over'));
+            });
+            el.addEventListener('dragover', e => {
+                e.preventDefault();
+                container.querySelectorAll('.cur-astro-item').forEach(e=>e.classList.remove('drag-over'));
+                el.classList.add('drag-over');
+            });
+            el.addEventListener('drop', e => {
+                e.preventDefault();
+                const destId = parseInt(el.dataset.curId);
+                if(_curDragId === null || _curDragId === destId) return;
+                const arr = db.astro.current;
+                const fromIdx = arr.findIndex(i=>i.id===_curDragId);
+                const toIdx   = arr.findIndex(i=>i.id===destId);
+                if(fromIdx<0||toIdx<0) return;
+                const moved = arr.splice(fromIdx,1)[0];
+                arr.splice(toIdx,0,moved);
+                save(); renderAstroPanel();
+            });
+
+            // 觸控拖曳
+            const handle = el.querySelector('.cur-item-drag-handle');
+            if(handle) {
+                handle.addEventListener('touchstart', e => {
+                    touchSrcId = parseInt(el.dataset.curId);
+                    touchLastY = e.touches[0].clientY;
+                    el.classList.add('dragging');
+                    e.preventDefault();
+                }, {passive:false});
+            }
+        });
+
+        container.addEventListener('touchmove', e => {
+            if(touchSrcId === null) return;
+            e.preventDefault();
+            const y = e.touches[0].clientY;
+            const els = [...container.querySelectorAll('.cur-astro-item')];
+            container.querySelectorAll('.cur-astro-item').forEach(e=>e.classList.remove('drag-over'));
+            const target = els.find(el => {
+                const r = el.getBoundingClientRect();
+                return y >= r.top && y <= r.bottom;
+            });
+            if(target) target.classList.add('drag-over');
+        }, {passive:false});
+
+        container.addEventListener('touchend', e => {
+            if(touchSrcId === null) return;
+            const y = e.changedTouches[0].clientY;
+            const els = [...container.querySelectorAll('.cur-astro-item')];
+            const target = els.find(el => {
+                const r = el.getBoundingClientRect();
+                return y >= r.top && y <= r.bottom;
+            });
+            if(target) {
+                const destId = parseInt(target.dataset.curId);
+                if(touchSrcId !== destId) {
+                    const arr = db.astro.current;
+                    const fromIdx = arr.findIndex(i=>i.id===touchSrcId);
+                    const toIdx   = arr.findIndex(i=>i.id===destId);
+                    if(fromIdx>=0 && toIdx>=0) {
+                        const moved = arr.splice(fromIdx,1)[0];
+                        arr.splice(toIdx,0,moved);
+                        save(); renderAstroPanel();
+                    }
+                }
+            }
+            touchSrcId = null;
+            container.querySelectorAll('.cur-astro-item').forEach(e=>e.classList.remove('dragging','drag-over'));
+        });
+    }
+
+    function addCurAstroItem() {
+        if(!Array.isArray(db.astro.current)) db.astro.current = [];
+        const newId = Date.now();
+        db.astro.current.push({id: newId, title:'', period:'', dateStart:'', dateEnd:'', text:''});
+        astroCurEditingId = newId;
+        db.astro.collapsed['current'] = false;
+        save(); renderAstroPanel();
+        setTimeout(()=>{ document.getElementById(`curItem_${newId}`)?.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 100);
+    }
+    function saveCurAstroItem(id) {
+        const item = db.astro.current.find(i=>i.id===id); if(!item) return;
+        item.title     = document.getElementById(`curTitle_${id}`)?.value.trim()||'';
+        item.dateStart = document.getElementById(`curDateStart_${id}`)?.value||'';
+        item.dateEnd   = document.getElementById(`curDateEnd_${id}`)?.value||'';
+        item.period    = fmtAstroPeriod(item.dateStart, item.dateEnd);
+        item.text      = document.getElementById(`curText_${id}`)?.value.trim()||'';
+        // 儲存後自動展開該項目
+        astroCurExpanded[id] = true;
+        if(!db.astro.itemExpanded) db.astro.itemExpanded = {};
+        db.astro.itemExpanded[id] = true;
+        save(); astroCurEditingId=null; renderAstroPanel();
+    }
+    function delCurAstroItemConfirm(id) {
+        if(!confirm('確定刪除此項目？')) return;
+        db.astro.current = db.astro.current.filter(i=>i.id!==id);
+        delete astroCurExpanded[id];
+        save(); renderAstroPanel();
+    }
+
+    function fmtAstroPeriod(start, end) {
+        const fmt = ds => {
+            if(!ds) return '';
+            const d = new Date(ds + 'T00:00:00');
+            return `${d.getFullYear()} 年 ${String(d.getMonth()+1).padStart(2,'0')} 月 ${String(d.getDate()).padStart(2,'0')} 日`;
+        };
+        const s = fmt(start), e = fmt(end);
+        if(s && e) return `${s} ～ ${e}`;
+        return s || e;
+    }
+    function delCurAstroItem(id) {
+        if(!confirm('確定刪除此項目？')) return;
+        db.astro.current = db.astro.current.filter(i=>i.id!==id);
+        delete astroCurExpanded[id];
+        save(); renderAstroPanel();
+    }
+
+    // ── 收合區塊包裝 ──
+    function buildAstroSection(type) {
+        const isMonth = type === 'month';
+        const key = type;
+        const collapsed = !!db.astro.collapsed[key];
+        const titleLabel = isMonth ? '✦ 月運勢' : '✦ 週運勢';
+        const data = db.astro[type];
+        const hasContent = data.text?.trim() || Object.values(data.signs||{}).some(v=>v?.trim());
+
+        const section = document.createElement('div');
+        section.className = 'astro-section';
+        section.id = `astroSection_${type}`;
+
+        const inner = document.createElement('div');
+        inner.className = 'astro-section-inner';
+
+        // Header（點擊收合）
+        const header = document.createElement('div');
+        header.className = 'astro-collapse-header';
+        header.innerHTML = `
+            <span class="astro-collapse-title">${titleLabel}</span>
+            <div class="astro-collapse-right">
+                ${!collapsed ? `
+                    <button class="astro-icon-btn" onclick="event.stopPropagation();clearAstroFortune('${type}')" style="color:rgba(255,120,120,0.7);">清除</button>
+                    <button class="astro-icon-btn" onclick="event.stopPropagation();startAstroFortune('${type}')">編輯 ✎</button>
+                ` : ''}
+                <span class="astro-collapse-arrow ${collapsed?'':'open'}">▲</span>
+            </div>`;
+        header.onclick = () => toggleAstroCollapse(key);
+
+        // Body
+        const body = document.createElement('div');
+        body.className = `astro-collapse-body${collapsed?' hidden':''}`;
+        body.id = `astroBody_${type}`;
+
+        if (astroEditState[type]) {
+            body.innerHTML = buildFortureEditHtml(type, data);
+        } else {
+            body.innerHTML = buildFortuneViewHtml(type, data);
+            setTimeout(() => attachChipListeners(body, type), 0);
+        }
+
+        inner.appendChild(header);
+        inner.appendChild(body);
+        section.appendChild(inner);
+        return section;
+    }
+
+    function buildFortuneViewHtml(type, data) {
+        const isMonth = type === 'month';
+        const chipsHtml = ASTRO_SIGNS.map(s => {
+            const has = data.signs?.[s]?.trim();
+            return `<span class="astro-sign-chip ${has?'has-note':''}" data-type="${type}" data-sign="${s}">${s}</span>`;
+        }).join('');
+        return `
+            ${data.period ? `<div class="astro-fortune-period">📅 ${aEsc(data.period)}</div>` : ''}
+            ${data.text   ? `<div class="astro-fortune-text">${aEsc(data.text)}</div>` : `<div class="astro-fortune-empty">尚未填寫整體運勢 ✨</div>`}
+            <div class="astro-signs-row">${chipsHtml}</div>`;
+    }
+
+    function buildFortureEditHtml(type, data) {
+        const isMonth = type === 'month';
+        const signsHtml = ASTRO_SIGNS.map(s =>
+            `<div class="astro-sign-block">
+                <label>${s}</label>
+                <textarea class="astro-fortune-textarea astro-sign-ta" data-sign="${s}" rows="2" placeholder="運勢內容...">${aEsc(data.signs?.[s]||'')}</textarea>
+            </div>`
+        ).join('');
+        return `
+            <input class="astro-fortune-input" id="astro_${type}_period" placeholder="${isMonth?'月份（如：2026年3月）':'週期（如：3/3–3/9）'}" value="${aEsc(data.period)}">
+            <textarea class="astro-fortune-textarea" id="astro_${type}_text" rows="4" placeholder="整體${isMonth?'月':'週'}運勢概述...">${aEsc(data.text)}</textarea>
+            <div style="font-size:0.7rem;color:rgba(200,170,255,0.55);letter-spacing:1.5px;margin:12px 0 6px;">各星座運勢</div>
+            <div class="astro-signs-grid">${signsHtml}</div>
+            <div class="astro-btn-row">
+                <button class="astro-cancel-btn" onclick="cancelAstroFortune('${type}')">取消</button>
+                <button class="astro-save-btn" onclick="saveAstroFortune('${type}')">✦ 儲存</button>
+            </div>`;
+    }
+
+    function attachChipListeners(body, type) {
+        body.querySelectorAll('.astro-sign-chip').forEach(chip => {
+            chip.addEventListener('click', e => {
+                e.stopPropagation();
+                const sign = chip.dataset.sign;
+                const t    = chip.dataset.type;
+                const text = db.astro[t]?.signs?.[sign];
+                if(!text?.trim()) return;
+                openAstroSignModal(sign, text);
+            });
+        });
+    }
+
+    function toggleAstroCollapse(key) {
+        db.astro.collapsed[key] = !db.astro.collapsed[key];
+        save(); renderAstroPanel();
+    }
+
+    function startAstroFortune(type) { astroEditState[type]=true; renderAstroPanel(); }
+    function cancelAstroFortune(type) { astroEditState[type]=false; renderAstroPanel(); }
+    function clearAstroFortune(type) {
+        if(!confirm(`確定清除所有${type==='month'?'月':'週'}運勢內容？`)) return;
+        db.astro[type] = {period:'', text:'', signs:{}};
+        save(); astroEditState[type]=false; renderAstroPanel();
+    }
+    function saveAstroFortune(type) {
+        db.astro[type].period = document.getElementById(`astro_${type}_period`)?.value.trim()||'';
+        db.astro[type].text   = document.getElementById(`astro_${type}_text`)?.value.trim()||'';
+        if(!db.astro[type].signs) db.astro[type].signs={};
+        document.getElementById(`astroBody_${type}`)?.querySelectorAll('.astro-sign-ta').forEach(el=>{
+            db.astro[type].signs[el.dataset.sign] = el.value.trim();
+        });
+        save(); astroEditState[type]=false; renderAstroPanel();
+    }
+
+    function openAstroSignModal(sign, text) {
+        let modal = document.getElementById('astroSignModal');
+        if(modal) modal.remove();
+        modal = document.createElement('div');
+        modal.id = 'astroSignModal';
+        modal.style.cssText = 'position:fixed;inset:0;z-index:800;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,0.55);';
+        modal.onclick = e => { if(e.target===modal) modal.remove(); };
+        modal.innerHTML = `<div style="background:linear-gradient(160deg,#0d0d2b,#1a0a2e);border:1px solid rgba(150,100,255,0.3);border-radius:20px 20px 0 0;padding:24px 20px 36px;width:100%;max-width:500px;max-height:70vh;overflow-y:auto;">
+            <div style="font-size:1.05rem;font-weight:bold;color:#d4aaff;margin-bottom:14px;">${sign}</div>
+            <div style="font-size:0.95rem;color:#e8d5ff;line-height:1.7;white-space:pre-wrap;">${aEsc(text)}</div>
+            <button onclick="document.getElementById('astroSignModal').remove()" style="margin-top:20px;width:100%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:rgba(255,255,255,0.5);padding:10px;cursor:pointer;font-family:inherit;">關閉</button>
+        </div>`;
+        document.body.appendChild(modal);
+    }
+
+    // ── 多星盤 ──
+    function buildAstroChartSection(chart) {
+        const key = `chart_${chart.id}`;
+        const collapsed = !!db.astro.collapsed[key];
+        if(!astroChartState[chart.id]) astroChartState[chart.id] = { tab:'positions', editing:false };
+        const state = astroChartState[chart.id];
+
+        const section = document.createElement('div');
+        section.className = 'astro-section';
+
+        const inner = document.createElement('div');
+        inner.className = 'astro-section-inner';
+
+        const header = document.createElement('div');
+        header.className = 'astro-collapse-header';
+        header.innerHTML = `
+            <span class="astro-collapse-title">✦ ${aEsc(chart.name)}</span>
+            <div class="astro-collapse-right">
+                ${!collapsed ? `
+                    <button class="astro-icon-btn" onclick="event.stopPropagation();delAstroChart(${chart.id})" style="color:rgba(255,100,100,0.65);">刪除</button>
+                    <button class="astro-icon-btn" onclick="event.stopPropagation();startChartEdit(${chart.id})">編輯 ✎</button>
+                ` : ''}
+                <span class="astro-collapse-arrow ${collapsed?'':'open'}">▲</span>
+            </div>`;
+        header.onclick = () => toggleAstroCollapse(key);
+
+        const body = document.createElement('div');
+        body.className = `astro-collapse-body${collapsed?' hidden':''}`;
+        body.id = `astroChartBody_${chart.id}`;
+        body.innerHTML = buildChartBodyHtml(chart, state);
+
+        inner.appendChild(header);
+        inner.appendChild(body);
+        section.appendChild(inner);
+        return section;
+    }
+
+    function buildChartBodyHtml(chart, state) {
+        const cfg = CHART_CFG[state.tab];
+        const rows = chart[state.tab] || [];
+        const tabsHtml = ['positions','houses'].map(t=>
+            `<button class="astro-chart-tab ${state.tab===t?'active':''}" onclick="setChartTab(${chart.id},'${t}')">${t==='positions'?'星位':'宮位'}</button>`
+        ).join('');
+
+        // 星盤名稱 & tab
+        const nameField = state.editing
+            ? `<input class="astro-chart-name-input" id="chartName_${chart.id}" value="${aEsc(chart.name)}" placeholder="星盤名稱">`
+            : '';
+
+        if(!state.editing) {
+            const tableRows = rows.length===0
+                ? `<tr><td colspan="4" style="text-align:center;color:rgba(200,170,255,0.3);padding:16px 0;">尚未填寫，點「編輯」新增</td></tr>`
+                : rows.map(r=>`<tr>
+                    <td>${aEsc(r[cfg.fields[0]]||'')}</td>
+                    <td>${aEsc(r[cfg.fields[1]]||'')}</td>
+                    <td>${aEsc(r[cfg.fields[2]]||'')}</td>
+                    <td class="astro-note-cell">${aEsc(r[cfg.fields[3]]||'')}</td>
+                </tr>`).join('');
+            return `
+                <div class="astro-chart-tabs">${tabsHtml}</div>
+                <table class="astro-table">
+                    <thead><tr>${cfg.cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead>
+                    <tbody>${tableRows}</tbody>
+                </table>`;
+        } else {
+            const editRows = rows.map((r,i)=>
+                `<div class="astro-chart-edit-row">
+                    ${cfg.fields.map((f,fi)=>`<input class="astro-chart-input" data-row="${i}" data-field="${f}" placeholder="${cfg.ph[fi]}" value="${aEsc(r[f]||'')}">` ).join('')}
+                    <button class="astro-del-btn" onclick="delChartRow(${chart.id},${i})">✕</button>
+                </div>`
+            ).join('');
+            return `
+                <div id="chartEditRows_${chart.id}">
+                    ${nameField}
+                    <div class="astro-chart-tabs">${tabsHtml}</div>
+                    ${editRows}
+                </div>
+                <button class="astro-add-row-btn" onclick="addChartRow(${chart.id})">＋ 新增一列</button>
+                <div class="astro-btn-row">
+                    <button class="astro-cancel-btn" onclick="cancelChartEdit(${chart.id})">取消</button>
+                    <button class="astro-save-btn" onclick="saveChartEdit(${chart.id})">✦ 儲存</button>
+                </div>`;
+        }
+    }
+
+    function setChartTab(id, tab) {
+        if(!astroChartState[id]) astroChartState[id]={tab,editing:false};
+        astroChartState[id].tab = tab;
+        astroChartState[id].editing = false;
+        renderAstroPanel();
+    }
+    function startChartEdit(id) { astroChartState[id].editing=true; renderAstroPanel(); }
+    function cancelChartEdit(id) { astroChartState[id].editing=false; renderAstroPanel(); }
+
+    function syncChartFromDOM(chart) {
+        const state = astroChartState[chart.id];
+        const container = document.getElementById(`chartEditRows_${chart.id}`);
+        if(!container) return;
+        const nameEl = document.getElementById(`chartName_${chart.id}`);
+        if(nameEl) chart.name = nameEl.value.trim() || chart.name;
+        const inputs = container.querySelectorAll('.astro-chart-input');
+        const rows = chart[state.tab];
+        inputs.forEach(inp => {
+            const i = parseInt(inp.dataset.row);
+            const f = inp.dataset.field;
+            if(rows[i]) rows[i][f] = inp.value;
+        });
+    }
+
+    function addChartRow(id) {
+        const chart = db.astro.charts.find(c=>c.id===id); if(!chart) return;
+        syncChartFromDOM(chart);
+        const tab = astroChartState[id].tab;
+        const blank={}; CHART_CFG[tab].fields.forEach(f=>blank[f]='');
+        if(!chart[tab]) chart[tab]=[];
+        chart[tab].push(blank);
+        save(); renderAstroPanel();
+    }
+    function delChartRow(id, i) {
+        const chart = db.astro.charts.find(c=>c.id===id); if(!chart) return;
+        syncChartFromDOM(chart);
+        chart[astroChartState[id].tab].splice(i,1);
+        save(); renderAstroPanel();
+    }
+    function saveChartEdit(id) {
+        const chart = db.astro.charts.find(c=>c.id===id); if(!chart) return;
+        syncChartFromDOM(chart);
+        save(); astroChartState[id].editing=false; renderAstroPanel();
+    }
+    function addAstroChart() {
+        const newId = Date.now();
+        db.astro.charts.push({id:newId, name:'新星盤', positions:[], houses:[]});
+        astroChartState[newId] = {tab:'positions', editing:true};
+        save(); renderAstroPanel();
+        // 捲到底部
+        setTimeout(()=>{ const s=document.getElementById('astroPanelScroll'); if(s) s.scrollTop=s.scrollHeight; },100);
+    }
+    function delAstroChart(id) {
+        if(db.astro.charts.length<=1){ alert('至少保留一個星盤'); return; }
+        if(!confirm('確定刪除此星盤？')) return;
+        db.astro.charts = db.astro.charts.filter(c=>c.id!==id);
+        delete astroChartState[id];
+        save(); renderAstroPanel();
+    }
+
+    function initApp() {
+        currentCat = db.catOrder[0] || "我的筆記";
+        goToday();
+        renderShopTabs(); renderShop();
+        if(window.innerWidth >= 768) switchPanel(0);
+        else switchPanel(0);
+        updateInputTime();
+        setInterval(() => {
+            if(document.activeElement !== document.getElementById('jnTimeInput')) updateInputTime();
+        }, 60000);
+    }
+
+    window.onload = () => {
+        // Auth 監聽已在宣告時啟動，登入後自動呼叫 initApp()
+    };
+</script>
+
+<!-- 搜尋介面 -->
+<div class="search-overlay" id="searchOverlay">
+    <div class="search-header">
+        <input class="search-input" id="searchInput" placeholder="搜尋時間軸、行事曆、書籤、購物、星象..." oninput="doSearch(this.value)" autocomplete="off">
+        <button class="search-cancel" onclick="closeSearch()">取消</button>
+    </div>
+    <div class="search-results" id="searchResults">
+        <div class="search-empty">輸入關鍵字開始搜尋</div>
+    </div>
+</div>
+
+</body>
+</html>
