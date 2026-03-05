@@ -658,7 +658,7 @@
     let currentUser    = null;
     let firestoreDocRef = null;
     let saveTimeout    = null;
-    let localWriteAt   = 0; // 最後一次本地寫入 Firestore 的時間戳
+    let lastWriteToken = null; // 最後一次本地寫入的唯一 token，用於過濾自己的回音
 
     // db：優先從 localStorage 讀（離線 cache）
     let db = JSON.parse(localStorage.getItem('mega_v14_final_fix')) || {
@@ -673,8 +673,9 @@
         if(!firestoreDocRef) return;
         clearTimeout(saveTimeout);
         saveTimeout = setTimeout(() => {
-            localWriteAt = Date.now();
-            firestoreDocRef.set({ data: JSON.stringify(db) })
+            const token = Date.now().toString() + Math.random().toString(36).slice(2);
+            lastWriteToken = token;
+            firestoreDocRef.set({ data: JSON.stringify(db), writeToken: token })
                 .then(()  => showSync('☁ 已同步'))
                 .catch(() => showSync('⚠ 同步失敗'));
         }, 800);
@@ -793,8 +794,9 @@
                         firestoreDocRef.set({ data: JSON.stringify(db) });
                     } else {
                         // 已初始化後的更新（其他裝置觸發）
-                        // 若距離上次本地寫入不足 4 秒，忽略（這是自己發出的回音）
-                        if(Date.now() - localWriteAt < 4000) {
+                        // 比對 token：若是自己剛寫的回音，忽略
+                        const incoming = snap.data();
+                        if(incoming.writeToken && incoming.writeToken === lastWriteToken) {
                             showSync('☁ 已同步');
                             return;
                         }
