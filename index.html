@@ -673,10 +673,10 @@
         localStorage.setItem('mega_v14_final_fix', JSON.stringify(db));
         if(!firestoreDocRef) return;
         clearTimeout(saveTimeout);
+        // token 立刻設定，不等 debounce，確保 onSnapshot 回音能被正確過濾
+        lastWriteToken = Date.now().toString() + Math.random().toString(36).slice(2);
         saveTimeout = setTimeout(() => {
-            const token = Date.now().toString() + Math.random().toString(36).slice(2);
-            lastWriteToken = token;
-            firestoreDocRef.set({ data: JSON.stringify(db), writeToken: token, lastModified: db.lastModified })
+            firestoreDocRef.set({ data: JSON.stringify(db), writeToken: lastWriteToken, lastModified: db.lastModified })
                 .then(()  => showSync('☁ 已同步'))
                 .catch(() => showSync('⚠ 同步失敗'));
         }, 800);
@@ -807,10 +807,14 @@
                         }
                     } else {
                         // 已初始化後的推送（其他裝置觸發）
-                        // 比對 token：是自己的回音就忽略
                         const incoming = snap.data();
+                        // 1. 是自己的回音 → 忽略
                         if(incoming.writeToken && incoming.writeToken === lastWriteToken) {
                             showSync('☁ 已同步');
+                            return;
+                        }
+                        // 2. 雲端資料比本地舊（例如自己剛存但回音還沒來）→ 也忽略，保護本地資料
+                        if((incoming.lastModified || 0) < (db.lastModified || 0)) {
                             return;
                         }
                         db = cloudDb;
