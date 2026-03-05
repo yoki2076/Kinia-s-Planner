@@ -669,13 +669,14 @@
 
     // save()：寫 localStorage + 防抖 800ms 寫 Firestore
     function save() {
+        db.lastModified = Date.now(); // 記錄最後修改時間，用於跨裝置新舊比較
         localStorage.setItem('mega_v14_final_fix', JSON.stringify(db));
         if(!firestoreDocRef) return;
         clearTimeout(saveTimeout);
         saveTimeout = setTimeout(() => {
             const token = Date.now().toString() + Math.random().toString(36).slice(2);
             lastWriteToken = token;
-            firestoreDocRef.set({ data: JSON.stringify(db), writeToken: token })
+            firestoreDocRef.set({ data: JSON.stringify(db), writeToken: token, lastModified: db.lastModified })
                 .then(()  => showSync('☁ 已同步'))
                 .catch(() => showSync('⚠ 同步失敗'));
         }, 800);
@@ -784,14 +785,26 @@
             firestoreDocRef.onSnapshot(snap => {
                 if(snap.exists && snap.data().data) {
                     const cloudDb = JSON.parse(snap.data().data);
+                    const cloudTs = snap.data().lastModified || 0;
                     if(!appInited) {
-                        // 首次登入：合併離線資料與雲端資料
-                        db = mergeDb(db, cloudDb);
-                        if(!db.shop)  db.shop  = [];
-                        if(!db.astro) db.astro = {};
-                        localStorage.setItem('mega_v14_final_fix', JSON.stringify(db));
-                        // 把合併結果存回雲端
-                        firestoreDocRef.set({ data: JSON.stringify(db) });
+                        // 首次載入：比較本地與雲端的 lastModified
+                        const localTs = db.lastModified || 0;
+                        if(localTs > cloudTs) {
+                            // 本地比雲端新（例如離線期間有輸入）→ 合併後以本地為主，寫回雲端
+                            db = mergeDb(db, cloudDb);
+                            if(!db.shop)  db.shop  = [];
+                            if(!db.astro) db.astro = {};
+                            const token = Date.now().toString() + Math.random().toString(36).slice(2);
+                            lastWriteToken = token;
+                            localStorage.setItem('mega_v14_final_fix', JSON.stringify(db));
+                            firestoreDocRef.set({ data: JSON.stringify(db), writeToken: token, lastModified: localTs });
+                        } else {
+                            // 雲端比本地新（正常情況）→ 直接用雲端資料
+                            db = cloudDb;
+                            if(!db.shop)  db.shop  = [];
+                            if(!db.astro) db.astro = {};
+                            localStorage.setItem('mega_v14_final_fix', JSON.stringify(db));
+                        }
                     } else {
                         // 已初始化後的更新（其他裝置觸發）
                         // 比對 token：若是自己剛寫的回音，忽略
